@@ -1,0 +1,13 @@
+id,claim,value,unit,source,valid_until
+F01,Platform uptime,99.9,percent,SLA document v3,2027-12-31
+F02,Teams using Aurora,500,teams,Customer report Q3 2026,2026-12-31
+F03,Starter plan price,24,USD per month,Pricing page,2026-12-31
+F04,Starter plan price (old),19,USD per month,Old pricing page,2026-06-30
+F05,Average customer rating,4.6,out of 5,Review summary 2026,2026-12-31
+F06,Third-party integrations,40,integrations,Product catalogue,2026-12-31
+F07,Free trial length,14,days,Pricing page,2026-12-31
+F08,Countries served,32,countries,Customer report Q3 2026,2026-12-31
+F09,Dashboard load time,1.2,seconds,Performance report,2026-12-31
+F10,SOC 2 Type II certified,yes,status,Audit letter,2027-03-31
+F11,Data centre regions,3,regions,Infrastructure page,2027-12-31
+F12,Company founded,2019,year,About page,2099-12-31

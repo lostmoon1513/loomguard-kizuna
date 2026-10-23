@@ -1,0 +1,1 @@
+Aurora helps growing teams understand their numbers. The platform offers 99.9% uptime, more than 40 integrations and a 14 day free trial. The Starter plan costs $24 per month. Customers rate Aurora 4.6 out of 5.

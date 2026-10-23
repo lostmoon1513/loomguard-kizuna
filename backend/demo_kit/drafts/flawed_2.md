@@ -1,0 +1,1 @@
+Aurora is best-in-class and utilize AI to guarantee results. Used by 10,000 teams in 60 countries, our dashboard loads in 0.3 seconds. Start a 30 day free trial today.

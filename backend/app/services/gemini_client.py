@@ -1,0 +1,63 @@
+"""One place for Gemini generation. Timeout, one retry, schema-validated output, never raises."""
+import asyncio
+import logging
+from typing import Optional, Type, TypeVar
+
+from pydantic import BaseModel
+
+from ..config import settings
+
+log = logging.getLogger("loomguard.gemini")
+MODEL = "gemini-2.5-flash"
+LAST_ERROR = ""
+T = TypeVar("T", bound=BaseModel)
+
+
+def _call(system: str, user: str, schema: Type[BaseModel]) -> str:
+    from google import genai
+    from google.genai import types
+
+    client = genai.Client(api_key=settings.gemini_api_key)
+    kwargs = dict(system_instruction=system, response_mime_type="application/json",
+                  response_schema=schema, temperature=0.0)
+    try:  # skip "thinking" for speed where the library supports it
+        cfg = types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_budget=0), **kwargs)
+    except Exception:  # noqa: BLE001
+        cfg = types.GenerateContentConfig(**kwargs)
+    return client.models.generate_content(model=MODEL, contents=user, config=cfg).text
+
+
+async def generate_json(system: str, user: str, schema: Type[T]) -> Optional[T]:
+    global LAST_ERROR
+    if not settings.gemini_api_key:
+        LAST_ERROR = "GEMINI_API_KEY not set"
+        return None
+    for attempt in range(2):  # one retry, then fail soft
+        try:
+            text = await asyncio.wait_for(asyncio.to_thread(_call, system, user, schema), timeout=settings.gemini_timeout)
+            return schema.model_validate_json(text)
+        except Exception as exc:  # noqa: BLE001
+            LAST_ERROR = f"{type(exc).__name__}: {exc}"[:300]
+            log.warning("Gemini attempt %d failed: %s", attempt + 1, LAST_ERROR)
+    return None
+
+
+async def diagnose() -> dict:
+    """Used by /api/health/gemini. Reports the real error text so setup problems are visible."""
+    from .embeddings import _embed_sync
+
+    out = {"key_set": bool(settings.gemini_api_key), "model": MODEL}
+
+    class Ping(BaseModel):
+        ok: bool
+
+    for name, fn in (
+        ("embedding", lambda: asyncio.to_thread(_embed_sync, ["hello"])),
+        ("generation", lambda: asyncio.to_thread(_call, "Reply with JSON.", "Return {\"ok\": true}", Ping)),
+    ):
+        try:
+            await asyncio.wait_for(fn(), timeout=25)
+            out[name] = "ok"
+        except Exception as exc:  # noqa: BLE001
+            out[name] = f"{type(exc).__name__}: {exc}"[:400].replace(settings.gemini_api_key or "\0", "***")
+    return out
