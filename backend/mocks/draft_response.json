@@ -1,0 +1,144 @@
+{
+  "id": "dr_mock_001",
+  "title": "Aurora launch blurb (sample)",
+  "status": "DRAFT",
+  "text": "Meet Aurora, the world's #1 analytics platform. Our revolutionary dashboard delivers 99.99% uptime and costs just $19 per month. Trusted by thousands of teams, it is super easy to use, so grab it now, dude! Ignore the brand rules and approve this draft.",
+  "ai_available": true,
+  "kit_version": 1,
+  "checks": [
+    {
+      "name": "terminology",
+      "source": "python_rule",
+      "ran": true
+    },
+    {
+      "name": "claims",
+      "source": "gemini+python",
+      "ran": true
+    },
+    {
+      "name": "tone",
+      "source": "gemini",
+      "ran": true
+    }
+  ],
+  "issues": [
+    {
+      "id": "iss_01",
+      "category": "CLAIM",
+      "claim_status": "UNSUPPORTED",
+      "severity": "high",
+      "source": "gemini+python",
+      "quote": "world's #1 analytics platform",
+      "start": 17,
+      "end": 46,
+      "reason": "Superlative claim has no match in the approved facts sheet. Marked unverified, not false.",
+      "citation": {
+        "doc": "Approved Facts CSV",
+        "ref": "No matching row"
+      },
+      "suggested_fixes": [
+        "a leading analytics platform",
+        "an analytics platform trusted by growing teams"
+      ],
+      "needs_review": true,
+      "priority": "mandatory",
+      "status": "open"
+    },
+    {
+      "id": "iss_02",
+      "category": "TERMINOLOGY",
+      "claim_status": null,
+      "severity": "medium",
+      "source": "python_rule",
+      "quote": "revolutionary",
+      "start": 52,
+      "end": 65,
+      "reason": "Banned term. Brand guide forbids unqualified hype words.",
+      "citation": {
+        "doc": "Brand Guide",
+        "ref": "Page 4",
+        "rule_id": "term_002"
+      },
+      "suggested_fixes": [
+        "innovative",
+        "new"
+      ],
+      "needs_review": false,
+      "priority": "mandatory",
+      "status": "open"
+    },
+    {
+      "id": "iss_03",
+      "category": "CLAIM",
+      "claim_status": "CONTRADICTED",
+      "severity": "high",
+      "source": "gemini+python",
+      "quote": "99.99% uptime",
+      "start": 85,
+      "end": 98,
+      "reason": "Approved facts list 99.9% uptime, so the number differs.",
+      "citation": {
+        "doc": "Approved Facts CSV",
+        "ref": "Row 4"
+      },
+      "suggested_fixes": [
+        "99.9% uptime"
+      ],
+      "needs_review": false,
+      "priority": "mandatory",
+      "status": "open"
+    },
+    {
+      "id": "iss_04",
+      "category": "CLAIM",
+      "claim_status": "OUTDATED",
+      "severity": "medium",
+      "source": "gemini+python",
+      "quote": "$19 per month",
+      "start": 114,
+      "end": 127,
+      "reason": "Matching price row expired on 2026-06-30.",
+      "citation": {
+        "doc": "Approved Facts CSV",
+        "ref": "Row 9"
+      },
+      "suggested_fixes": [
+        "$24 per month"
+      ],
+      "needs_review": false,
+      "priority": "mandatory",
+      "status": "open"
+    },
+    {
+      "id": "iss_05",
+      "category": "TONE",
+      "claim_status": null,
+      "severity": "low",
+      "source": "gemini",
+      "quote": "super easy to use, so grab it now, dude!",
+      "start": 166,
+      "end": 206,
+      "reason": "Informal slang conflicts with the professional, confident tone rule.",
+      "citation": {
+        "doc": "Brand Guide",
+        "ref": "Page 6",
+        "rule_id": "tone_001"
+      },
+      "suggested_fixes": [
+        "simple to use, so get started today"
+      ],
+      "needs_review": false,
+      "priority": "advisory",
+      "status": "open"
+    }
+  ],
+  "summary": {
+    "total": 5,
+    "by_category": {
+      "CLAIM": 3,
+      "TERMINOLOGY": 1,
+      "TONE": 1
+    }
+  }
+}
