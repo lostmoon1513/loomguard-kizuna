@@ -1,7 +1,8 @@
 # Deploy LoomGuard (one link for judges)
 
 The backend also serves the web app (`backend/web/index.html`), so you deploy ONE service and get ONE URL.
-If Pradeep's separate React frontend is ready, deploy it on Vercel and add its URL to `CORS_ORIGINS` on the backend.
+If Pradeep's separate React frontend is ready, deploy it on Vercel. The backend allows this project's Vercel preview
+URLs automatically; add any other frontend URL to `CORS_ORIGINS` on the backend.
 
 ## Render (free), about 10 minutes
 1. Push the repo to GitHub (public, or add the organisers as collaborators). Never commit `.env`.

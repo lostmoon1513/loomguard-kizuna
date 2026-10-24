@@ -19,6 +19,10 @@ class Settings:
     mongo_uri: str = os.getenv("MONGO_URI", "")
     mongo_db: str = os.getenv("MONGO_DB", "loomguard")
     cors_origins: tuple = tuple(_list(os.getenv("CORS_ORIGINS", "http://localhost:5173,https://loomguard-kizuna.vercel.app")))
+    cors_origin_regex: str = os.getenv(
+        "CORS_ORIGIN_REGEX",
+        r"^https://loomguard-kizuna-[a-z0-9-]+-lostmoon-s-projects\.vercel\.app$",
+    )
     similarity_threshold: float = float(os.getenv("SIMILARITY_THRESHOLD", "0.55"))
     gemini_timeout: float = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "25"))
     max_upload_mb: int = int(os.getenv("MAX_UPLOAD_MB", "10"))
