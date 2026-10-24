@@ -8,9 +8,11 @@ INJECTION_PATTERNS = [
     r"ignore (all |the |any |previous |prior )*(brand )?(rules|instructions|guidelines)",
     r"disregard (all |the |any |previous |prior )*(brand )?(rules|instructions|guidelines)",
     r"(approve|pass|accept) this (draft|content|document)",
-    r"you are now",
-    r"system prompt",
-    r"do not (flag|report|check)",
+    r"you are now (?:the |an? |my |our )?(?:\w+ )?(?:approver|reviewer|manager|admin\w*|moderator|checker|judge|assistant|ai|system|compliance\w*)",
+    r"(?:reveal|show|ignore|override) (?:the |your )?system prompt",
+    r"system prompt\s*:",
+    r"\bapprove (?:everything|all of this|anything)\b",
+    r"do not (?:flag|report|check|review) (?:any|anything|this|the|these|those|it)\b",
     r"mark (this|it) as (compliant|approved)",
 ]
 _COMPILED = [re.compile(p, re.I) for p in INJECTION_PATTERNS]

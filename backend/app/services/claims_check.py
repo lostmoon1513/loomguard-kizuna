@@ -10,7 +10,7 @@ from typing import Optional
 
 from .issues import make_issue
 
-NUM = r"\d[\d,]*(?:\.\d+)?"
+NUM = r"\d(?:[\d,]*\d)?(?:\.\d+)?"
 CMP = r"(?:more than|over|at least|above)"
 LB = r"(?<![\w#$.,])"
 APOS = r"['’]"

@@ -8,6 +8,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import settings
@@ -105,3 +106,9 @@ async def health_gemini():
 async def mock_draft():
     """Fixed sample response so the frontend can build against the real shape."""
     return json.loads(MOCK_PATH.read_text(encoding="utf-8"))
+
+
+# Serve the web app from the same server (one link for judges, no CORS problems). Keep this LAST.
+WEB_DIR = Path(__file__).resolve().parent.parent / "web"
+if WEB_DIR.exists():
+    app.mount("/", StaticFiles(directory=str(WEB_DIR), html=True), name="web")

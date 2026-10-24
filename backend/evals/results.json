@@ -1,0 +1,111 @@
+{
+  "setup": {
+    "cases": 56,
+    "clean_cases": 23,
+    "gold_issues": 39,
+    "date_fixed_to": "2026-10-24"
+  },
+  "systems": {
+    "A: generic checker (no brand kit)": {
+      "tp": 7,
+      "fp": 0,
+      "fn": 32,
+      "precision": 1.0,
+      "recall": 0.1794871794871795,
+      "f1": 0.30434782608695654,
+      "false_positive_rate_on_clean": 0.0,
+      "clean_cases": 23,
+      "claim_status_accuracy": 0.0,
+      "claim_gold": 22,
+      "per_status": {
+        "CONTRADICTED": "0/11",
+        "OUTDATED": "0/3",
+        "UNSUPPORTED": "0/8"
+      },
+      "citation_accuracy": 0.0,
+      "citations_checked": 7,
+      "fix_accuracy": null,
+      "fixes_checked": 0,
+      "offset_exact": 1.0
+    },
+    "B: brand kit + retrieval only": {
+      "tp": 18,
+      "fp": 0,
+      "fn": 21,
+      "precision": 1.0,
+      "recall": 0.46153846153846156,
+      "f1": 0.631578947368421,
+      "false_positive_rate_on_clean": 0.0,
+      "clean_cases": 23,
+      "claim_status_accuracy": 0.36363636363636365,
+      "claim_gold": 22,
+      "per_status": {
+        "CONTRADICTED": "0/11",
+        "OUTDATED": "0/3",
+        "UNSUPPORTED": "8/8"
+      },
+      "citation_accuracy": 1.0,
+      "citations_checked": 9,
+      "fix_accuracy": 1.0,
+      "fixes_checked": 2,
+      "offset_exact": 1.0
+    },
+    "C: full LoomGuard": {
+      "tp": 39,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0,
+      "false_positive_rate_on_clean": 0.0,
+      "clean_cases": 23,
+      "claim_status_accuracy": 1.0,
+      "claim_gold": 22,
+      "per_status": {
+        "CONTRADICTED": "11/11",
+        "OUTDATED": "3/3",
+        "UNSUPPORTED": "8/8"
+      },
+      "citation_accuracy": 1.0,
+      "citations_checked": 23,
+      "fix_accuracy": 1.0,
+      "fixes_checked": 14,
+      "offset_exact": 1.0
+    }
+  },
+  "retrieval": {
+    "queries": 32,
+    "hit_at_1": 0.9375,
+    "hit_at_3": 0.96875,
+    "mrr": 0.953125,
+    "mode": "keyword (BM25) only",
+    "misses": [
+      {
+        "query": "are we allowed to say we are number one",
+        "source": "guide",
+        "expected": [
+          4
+        ],
+        "got": [
+          3
+        ],
+        "rank": null
+      }
+    ]
+  },
+  "guardrails": {
+    "injection_recall": 1.0,
+    "injection_cases": 8,
+    "benign_false_positive": 0.0,
+    "benign_cases": 6,
+    "tone_guard_bad_items": 5,
+    "tone_guard_phrases_kept": 2,
+    "tone_guard_bad_replacements_leaked": 0,
+    "tone_guard_valid_item_kept": true
+  },
+  "latency": {
+    "mean_ms": 0.7515267830707931,
+    "p95_ms": 1.0395999997854233,
+    "max_ms": 1.6595000051893294
+  }
+}

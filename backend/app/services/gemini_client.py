@@ -17,6 +17,8 @@ def mask(text: str) -> str:
     import re
     return re.sub(r"AIza[0-9A-Za-z_\-]{20,}|AQ\.[0-9A-Za-z_\-]{20,}", "***", out)
 LAST_ERROR = ""
+_blocked_until = 0.0  # after a quota error (429) skip Gemini for a while: no wasted calls, no slow checks
+QUOTA_KEYS = ("RESOURCE_EXHAUSTED", "429")
 T = TypeVar("T", bound=BaseModel)
 
 
@@ -36,9 +38,13 @@ def _call(system: str, user: str, schema: Type[BaseModel]) -> str:
 
 async def generate_json(system: str, user: str, schema: Type[T]) -> Optional[T]:
     global LAST_ERROR
+    global _blocked_until
     if not settings.gemini_api_key:
         LAST_ERROR = "GEMINI_API_KEY not set"
         return None
+    import time
+    if time.time() < _blocked_until:
+        return None  # LAST_ERROR still holds the quota message
     for attempt in range(2):  # one retry, then fail soft
         try:
             text = await asyncio.wait_for(asyncio.to_thread(_call, system, user, schema), timeout=settings.gemini_timeout)
@@ -48,6 +54,11 @@ async def generate_json(system: str, user: str, schema: Type[T]) -> Optional[T]:
             log.warning("Gemini attempt %d failed: %s", attempt + 1, LAST_ERROR)
             if any(k in LAST_ERROR for k in ("PERMISSION_DENIED", "API_KEY_INVALID", "UNAUTHENTICATED", "SUSPENDED")):
                 break  # a blocked key will not recover on retry
+            if any(k in LAST_ERROR for k in QUOTA_KEYS):
+                _blocked_until = time.time() + 600  # quota used up: stop calling for 10 minutes
+                break
+            if attempt == 0:
+                await asyncio.sleep(2.0)  # short pause: 503 "overloaded" and 429 usually clear in seconds
     return None
 
 

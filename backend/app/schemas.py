@@ -46,6 +46,7 @@ class CheckInfo(BaseModel):
     name: str
     source: IssueSource
     ran: bool
+    note: Optional[str] = None  # why an AI check did not run
 
 
 class Summary(BaseModel):

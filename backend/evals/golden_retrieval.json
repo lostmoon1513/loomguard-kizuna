@@ -1,0 +1,227 @@
+[
+ {
+  "source": "guide",
+  "query": "which words must we never use in marketing copy",
+  "expected": [
+   3
+  ]
+ },
+ {
+  "source": "guide",
+  "query": "banned hype words",
+  "expected": [
+   3
+  ]
+ },
+ {
+  "source": "guide",
+  "query": "are we allowed to say we are number one",
+  "expected": [
+   4
+  ]
+ },
+ {
+  "source": "guide",
+  "query": "rules about prices on the publication date",
+  "expected": [
+   4
+  ]
+ },
+ {
+  "source": "guide",
+  "query": "what is the primary brand colour",
+  "expected": [
+   5
+  ]
+ },
+ {
+  "source": "guide",
+  "query": "can we use red as a background",
+  "expected": [
+   5
+  ]
+ },
+ {
+  "source": "guide",
+  "query": "holiday campaign colour exception",
+  "expected": [
+   5
+  ]
+ },
+ {
+  "source": "guide",
+  "query": "contrast ratio for text",
+  "expected": [
+   5
+  ]
+ },
+ {
+  "source": "guide",
+  "query": "alt text for images",
+  "expected": [
+   5
+  ]
+ },
+ {
+  "source": "guide",
+  "query": "how long should sentences be",
+  "expected": [
+   6
+  ]
+ },
+ {
+  "source": "guide",
+  "query": "reading grade target",
+  "expected": [
+   6
+  ]
+ },
+ {
+  "source": "guide",
+  "query": "can we use slang like dude",
+  "expected": [
+   2
+  ]
+ },
+ {
+  "source": "guide",
+  "query": "Aurora Youth informal expressions",
+  "expected": [
+   2
+  ]
+ },
+ {
+  "source": "guide",
+  "query": "what voice should writers use",
+  "expected": [
+   2
+  ]
+ },
+ {
+  "source": "guide",
+  "query": "say customers or users",
+  "expected": [
+   3
+  ]
+ },
+ {
+  "source": "guide",
+  "query": "use or utilize",
+  "expected": [
+   3
+  ]
+ },
+ {
+  "source": "guide",
+  "query": "statistics must match the approved facts",
+  "expected": [
+   4
+  ]
+ },
+ {
+  "source": "guide",
+  "query": "promise guaranteed outcomes",
+  "expected": [
+   3,
+   4
+  ]
+ },
+ {
+  "source": "guide",
+  "query": "avoid jargon",
+  "expected": [
+   6
+  ]
+ },
+ {
+  "source": "guide",
+  "query": "what is Aurora",
+  "expected": [
+   1
+  ]
+ },
+ {
+  "source": "guide",
+  "query": "who must follow this guide",
+  "expected": [
+   1
+  ]
+ },
+ {
+  "source": "facts",
+  "query": "uptime",
+  "expected": [
+   2
+  ]
+ },
+ {
+  "source": "facts",
+  "query": "how many teams use Aurora",
+  "expected": [
+   3
+  ]
+ },
+ {
+  "source": "facts",
+  "query": "starter plan price",
+  "expected": [
+   4
+  ]
+ },
+ {
+  "source": "facts",
+  "query": "customer rating",
+  "expected": [
+   6
+  ]
+ },
+ {
+  "source": "facts",
+  "query": "number of integrations",
+  "expected": [
+   7
+  ]
+ },
+ {
+  "source": "facts",
+  "query": "free trial length",
+  "expected": [
+   8
+  ]
+ },
+ {
+  "source": "facts",
+  "query": "countries served",
+  "expected": [
+   9
+  ]
+ },
+ {
+  "source": "facts",
+  "query": "dashboard load time",
+  "expected": [
+   10
+  ]
+ },
+ {
+  "source": "facts",
+  "query": "SOC 2 certification",
+  "expected": [
+   11
+  ]
+ },
+ {
+  "source": "facts",
+  "query": "data centre regions",
+  "expected": [
+   12
+  ]
+ },
+ {
+  "source": "facts",
+  "query": "when was the company founded",
+  "expected": [
+   13
+  ]
+ }
+]

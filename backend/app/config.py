@@ -20,7 +20,7 @@ class Settings:
     mongo_db: str = os.getenv("MONGO_DB", "loomguard")
     cors_origins: tuple = tuple(_list(os.getenv("CORS_ORIGINS", "http://localhost:5173")))
     similarity_threshold: float = float(os.getenv("SIMILARITY_THRESHOLD", "0.55"))
-    gemini_timeout: float = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "10"))
+    gemini_timeout: float = float(os.getenv("GEMINI_TIMEOUT_SECONDS", "25"))
     max_upload_mb: int = int(os.getenv("MAX_UPLOAD_MB", "10"))
     autoload_demo: bool = os.getenv("AUTOLOAD_DEMO", "true").lower() == "true"
 

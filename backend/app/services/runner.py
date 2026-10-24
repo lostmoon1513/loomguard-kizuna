@@ -51,11 +51,16 @@ async def run_checks(text: str, kit, use_ai: bool = True) -> dict:
         if tone:
             issues += tone
         ai_ok = phrases is not None and tone is not None
-        checks.append({"name": "claims_ai_extraction", "source": "gemini+python", "ran": phrases is not None})
-        checks.append({"name": "tone", "source": "gemini", "ran": tone is not None})
+        from . import gemini_client
+        why = gemini_client.LAST_ERROR or "Gemini returned no usable answer"
+        checks.append({"name": "claims_ai_extraction", "source": "gemini+python", "ran": phrases is not None,
+                       "note": None if phrases is not None else why})
+        checks.append({"name": "tone", "source": "gemini", "ran": tone is not None,
+                       "note": None if tone is not None else why})
     else:
-        checks.append({"name": "claims_ai_extraction", "source": "gemini+python", "ran": False})
-        checks.append({"name": "tone", "source": "gemini", "ran": False})
+        why = "AI switched off for this draft" if settings.gemini_api_key else "GEMINI_API_KEY not set"
+        checks.append({"name": "claims_ai_extraction", "source": "gemini+python", "ran": False, "note": why})
+        checks.append({"name": "tone", "source": "gemini", "ran": False, "note": why})
     issues = finalize(issues)
     result = {"issues": issues, "checks": checks, "ai_available": ai_ok, "summary": summarize(issues)}
     if ai_ok or not use_ai:
