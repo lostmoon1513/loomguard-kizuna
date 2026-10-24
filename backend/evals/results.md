@@ -27,7 +27,7 @@ Misses (honest failures):
 
 ## 4. Speed (rule-based checks)
 
-Mean 0.8 ms, p95 1.0 ms, max 1.7 ms per draft. AI calls add network time.
+Mean 1.0 ms, p95 1.4 ms, max 1.5 ms per draft. AI calls add network time.
 
 ## 5. What this evaluation found (and what we changed)
 
