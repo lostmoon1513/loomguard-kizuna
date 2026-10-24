@@ -96,6 +96,10 @@ npm run dev
 ```
 Open http://localhost:5173.
 
+For local full-stack testing, start the backend separately at `http://localhost:8000` and keep the frontend's
+`VITE_API_URL` set to that address. The production frontend build uses `frontend/.env.production` and connects to
+the deployed Render API.
+
 **Never commit `.env` or API keys.** Add them to `.gitignore` before the first commit.
 
 ## 4. The contract (read this before writing code)
@@ -163,7 +167,7 @@ If all eight pass on the live link in an incognito window, you are ready to subm
 | Part | Where | Notes |
 |---|---|---|
 | Backend | Render or Railway | Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`. Set the `.env` values as service env vars. Free tiers sleep, so open the URL before any demo |
-| Frontend | Vercel or Netlify | Set `VITE_API_URL` to the backend URL. Update backend `CORS_ORIGINS` to the frontend URL |
+| Frontend | Vercel or Netlify | Production builds use `frontend/.env.production`. Set `VITE_API_URL` in the hosting dashboard to override it. Add the frontend origin to backend `CORS_ORIGINS` if it is not already allowed |
 | Database | MongoDB Atlas M0 | Allow the host's IPs (or 0.0.0.0/0 for the hackathon) |
 | Vector store | ChromaDB inside the backend | Disk may reset on free hosting. Rebuild the index on startup from the chunks stored in Mongo |
 
