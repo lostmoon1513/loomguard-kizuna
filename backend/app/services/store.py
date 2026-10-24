@@ -5,7 +5,7 @@ from typing import Optional
 
 import numpy as np
 
-from ..db import get_db
+from ..db import get_db, mark_down, mongo_ok
 from .embeddings import embed
 from .retrieval import HybridIndex
 
@@ -52,21 +52,22 @@ async def set_kit(chunks, facts, guide_name, facts_name) -> Kit:
 
 async def save_kit() -> None:
     db = get_db()
-    if db is None:
+    if db is None or not mongo_ok():
         return
     try:
         doc = {"_id": "current", "version": KIT.version, "guide_name": KIT.guide_name, "facts_name": KIT.facts_name,
                "chunks": KIT.chunks, "facts": KIT.facts, "terms": KIT.terms}
         await db.brand_kits.replace_one({"_id": "current"}, doc, upsert=True)
     except Exception as exc:  # noqa: BLE001
-        log.warning("Could not save kit to MongoDB: %s", exc)
+        mark_down()
+        log.warning("Could not save kit to MongoDB (will skip Mongo for 60 s): %s", str(exc)[:160])
 
 
 async def load_kit() -> None:
     """Called at startup: rebuild the in-memory indexes from the saved kit."""
     global KIT
     db = get_db()
-    if db is None:
+    if db is None or not mongo_ok():
         return
     try:
         doc = await db.brand_kits.find_one({"_id": "current"})
@@ -78,4 +79,5 @@ async def load_kit() -> None:
         KIT = kit
         log.info("Loaded kit v%s: %d chunks, %d facts", kit.version, len(kit.chunks), len(kit.facts))
     except Exception as exc:  # noqa: BLE001
-        log.warning("Could not load kit from MongoDB: %s", exc)
+        mark_down()
+        log.warning("Could not load kit from MongoDB (will skip Mongo for 60 s): %s", str(exc)[:160])

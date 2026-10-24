@@ -12,8 +12,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import settings
 from .db import close_db, ping_db
-from .routers import brand, debug
-from .services import store
+from .routers import brand, debug, drafts
+from .services import drafts_store, store
 from .services.demo import demo_available, load_demo_kit
 from .services.gemini_client import diagnose
 
@@ -34,6 +34,7 @@ async def lifespan(_: FastAPI):
             log.info("Demo kit loaded automatically")
         except Exception as exc:  # noqa: BLE001
             log.warning("Demo kit autoload failed: %s", exc)
+    await drafts_store.load_all()
     yield
     close_db()
 
@@ -55,12 +56,19 @@ def error_json(status: int, code: str, message: str) -> JSONResponse:
 
 
 app.include_router(brand.router)
+app.include_router(drafts.router)
 app.include_router(debug.router)
 
 
 @app.exception_handler(StarletteHTTPException)  # also catches FastAPI's HTTPException and router 404s
 async def http_exc_handler(_: Request, exc: StarletteHTTPException):
-    return error_json(exc.status_code, f"HTTP_{exc.status_code}", str(exc.detail))
+    import re
+
+    detail = str(exc.detail)
+    m = re.match(r"^([A-Z][A-Z_]{2,}): (.*)$", detail, re.S)  # "NO_KIT: message" -> code + message
+    if m:
+        return error_json(exc.status_code, m.group(1), m.group(2))
+    return error_json(exc.status_code, f"HTTP_{exc.status_code}", detail)
 
 
 @app.exception_handler(RequestValidationError)

@@ -14,6 +14,8 @@ def _list(value: str) -> list[str]:
 @dataclass(frozen=True)
 class Settings:
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    gemini_embed_model: str = os.getenv("GEMINI_EMBED_MODEL", "gemini-embedding-001")
     mongo_uri: str = os.getenv("MONGO_URI", "")
     mongo_db: str = os.getenv("MONGO_DB", "loomguard")
     cors_origins: tuple = tuple(_list(os.getenv("CORS_ORIGINS", "http://localhost:5173")))

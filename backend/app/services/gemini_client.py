@@ -8,7 +8,14 @@ from pydantic import BaseModel
 from ..config import settings
 
 log = logging.getLogger("loomguard.gemini")
-MODEL = "gemini-2.5-flash"
+
+
+def mask(text: str) -> str:
+    """Never let the API key reach logs or API responses (Google error text can contain it)."""
+    key = settings.gemini_api_key
+    out = text.replace(key, "***") if key else text
+    import re
+    return re.sub(r"AIza[0-9A-Za-z_\-]{20,}|AQ\.[0-9A-Za-z_\-]{20,}", "***", out)
 LAST_ERROR = ""
 T = TypeVar("T", bound=BaseModel)
 
@@ -24,7 +31,7 @@ def _call(system: str, user: str, schema: Type[BaseModel]) -> str:
         cfg = types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_budget=0), **kwargs)
     except Exception:  # noqa: BLE001
         cfg = types.GenerateContentConfig(**kwargs)
-    return client.models.generate_content(model=MODEL, contents=user, config=cfg).text
+    return client.models.generate_content(model=settings.gemini_model, contents=user, config=cfg).text
 
 
 async def generate_json(system: str, user: str, schema: Type[T]) -> Optional[T]:
@@ -37,8 +44,10 @@ async def generate_json(system: str, user: str, schema: Type[T]) -> Optional[T]:
             text = await asyncio.wait_for(asyncio.to_thread(_call, system, user, schema), timeout=settings.gemini_timeout)
             return schema.model_validate_json(text)
         except Exception as exc:  # noqa: BLE001
-            LAST_ERROR = f"{type(exc).__name__}: {exc}"[:300]
+            LAST_ERROR = mask(f"{type(exc).__name__}: {exc}")[:300]
             log.warning("Gemini attempt %d failed: %s", attempt + 1, LAST_ERROR)
+            if any(k in LAST_ERROR for k in ("PERMISSION_DENIED", "API_KEY_INVALID", "UNAUTHENTICATED", "SUSPENDED")):
+                break  # a blocked key will not recover on retry
     return None
 
 
@@ -46,7 +55,7 @@ async def diagnose() -> dict:
     """Used by /api/health/gemini. Reports the real error text so setup problems are visible."""
     from .embeddings import _embed_sync
 
-    out = {"key_set": bool(settings.gemini_api_key), "model": MODEL}
+    out = {"key_set": bool(settings.gemini_api_key), "model": settings.gemini_model, "embed_model": settings.gemini_embed_model}
 
     class Ping(BaseModel):
         ok: bool
@@ -59,5 +68,5 @@ async def diagnose() -> dict:
             await asyncio.wait_for(fn(), timeout=25)
             out[name] = "ok"
         except Exception as exc:  # noqa: BLE001
-            out[name] = f"{type(exc).__name__}: {exc}"[:400].replace(settings.gemini_api_key or "\0", "***")
+            out[name] = mask(f"{type(exc).__name__}: {exc}")[:400]
     return out

@@ -7,7 +7,7 @@ from app.services.indexing import build_guide_chunks, parse_facts_csv
 from app.services.parsing import ParseError, parse_pdf, parse_draft_file
 from app.services.retrieval import HybridIndex
 
-KIT = Path(__file__).resolve().parents[2] / "sample_kit"
+KIT = Path(__file__).resolve().parents[1] / "demo_kit"
 
 
 @pytest.fixture(scope="module")

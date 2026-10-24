@@ -9,7 +9,7 @@ from app.services.issues import finalize
 from app.services.parsing import parse_pdf
 from app.services.rules_check import run_rules_check
 
-KIT = Path(__file__).resolve().parents[2] / "sample_kit"
+KIT = Path(__file__).resolve().parents[1] / "demo_kit"
 TERMS = json.loads((KIT / "terms.json").read_text(encoding="utf-8"))
 CHUNKS = build_guide_chunks(parse_pdf((KIT / "brand_guide.pdf").read_bytes()), "default", 1)
 

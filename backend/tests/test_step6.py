@@ -7,7 +7,7 @@ from app.services.claims_check import find_claims, run_claims_check, verify_extr
 from app.services.indexing import parse_facts_csv
 from app.services.issues import finalize
 
-KIT = Path(__file__).resolve().parents[2] / "sample_kit"
+KIT = Path(__file__).resolve().parents[1] / "demo_kit"
 FACTS = parse_facts_csv((KIT / "approved_facts.csv").read_bytes(), "default", 1)
 TODAY = date(2026, 10, 23)
 
