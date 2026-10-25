@@ -33,7 +33,26 @@ def _call(system: str, user: str, schema: Type[BaseModel]) -> str:
         cfg = types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_budget=0), **kwargs)
     except Exception:  # noqa: BLE001
         cfg = types.GenerateContentConfig(**kwargs)
-    return client.models.generate_content(model=settings.gemini_model, contents=user, config=cfg).text
+
+    # Try configured model, with automatic fallback if deprecated or 404
+    models_to_try = [settings.gemini_model]
+    for fb in ("gemini-3.8-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"):
+        if fb not in models_to_try:
+            models_to_try.append(fb)
+
+    last_exc = None
+    for model_name in models_to_try:
+        try:
+            return client.models.generate_content(model=model_name, contents=user, config=cfg).text
+        except Exception as exc:
+            err_msg = str(exc)
+            if any(k in err_msg for k in ("404", "NOT_FOUND", "no longer available", "not found")):
+                log.warning("Gemini model %s unavailable (%s), trying fallback...", model_name, exc)
+                last_exc = exc
+                continue
+            raise exc
+    if last_exc:
+        raise last_exc
 
 
 async def generate_json(system: str, user: str, schema: Type[T]) -> Optional[T]:
