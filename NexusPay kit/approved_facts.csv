@@ -1,0 +1,13 @@
+id,claim,value,unit,source,valid_until
+F01,Network availability uptime,99.95,percent,Global SLA Report 2026,2027-12-31
+F02,Average settlement speed,2.4,seconds,Q3 Latency Audit,2026-12-31
+F03,Annual transaction volume,12,billion USD,Annual Financial Report 2025,2026-12-31
+F04,Global partner banks,65,banks,Treasury Operations,2026-12-31
+F05,Active enterprise merchants,1200,merchants,Customer Operations,2026-12-31
+F06,Standard transaction fee,1.2,% per transaction,Fee Schedule v4,2027-06-30
+F07,Standard transaction fee (old),0.8,% per transaction,Q1 2026 Promo Schedule,2026-03-31
+F08,Customer satisfaction rating,4.8,out of 5,Enterprise NPS Survey 2026,2026-12-31
+F09,Supported currency corridors,48,countries,Compliance Directory,2026-12-31
+F10,Compliance certifications,SOC 2 Type II,status,Deloitte Audit Letter,2027-09-30
+F11,Direct clearing nodes,8,regions,Infrastructure Overview,2027-12-31
+F12,Founded year,2020,year,Corporate Registry,2099-12-31

@@ -1,0 +1,14 @@
+{
+  "banned": [
+    {"term": "unbreakable", "reason": "Unqualified security hyperbole"},
+    {"term": "disruptive", "reason": "Cliché tech buzzword"},
+    {"term": "infinitely-scalable", "reason": "Mathematically unverifiable technical claim"},
+    {"term": "rock-solid", "reason": "Vague marketing cliché"},
+    {"term": "bulletproof", "reason": "Misleading risk-free guarantee"}
+  ],
+  "preferred": [
+    {"avoid": "synergize", "use": "process"},
+    {"avoid": "users", "use": "merchants"}
+  ],
+  "hex_codes": ["#1E3A8A", "#0D9488", "#F59E0B"]
+}

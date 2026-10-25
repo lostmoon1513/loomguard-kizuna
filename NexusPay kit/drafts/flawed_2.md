@@ -1,0 +1,1 @@
+We synergize enterprise payments with rock-solid infrastructure. Over 8000 merchants across 90 countries rely on our bulletproof system with a legacy 0.8% fee. Sign up today for an infinitely-scalable experience.

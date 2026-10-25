@@ -1,0 +1,1 @@
+NexusPay provides enterprise treasury settlement across 48 countries. The platform delivers 99.95% uptime and 2.4 seconds average settlement speed. We work with 65 partner banks and 1200 merchants. Standard pricing is 1.2% per transaction, and clients rate NexusPay 4.8 out of 5.
