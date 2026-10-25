@@ -16,7 +16,7 @@ services:
       - key: MONGO_URI
         sync: false
       - key: GEMINI_MODEL
-        value: gemini-2.5-flash
+        value: gemini-3.8-flash
       - key: GEMINI_EMBED_MODEL
         value: gemini-embedding-001
       - key: AUTOLOAD_DEMO
