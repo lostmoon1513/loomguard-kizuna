@@ -1,195 +1,175 @@
-# LoomGuard: Pre-Publication Brand Review & Compliance
+# LoomGuard
 
-Team **KIZUNA** (RGUKT Basar) | Problem: *Intelligent Brand-Governance Platform* by Inkloom AI
+**Pre-publication brand review and compliance platform** · Team KIZUNA · Inkloom AI Hackathon, Round 2 (The Build)
 
-LoomGuard is a pre-flight check for marketing content. A creator uploads a draft, LoomGuard checks it against the brand guide and approved facts, points to the exact page or row behind each issue, suggests small phrase-level fixes, and passes the draft to a manager for sign-off. It never rewrites a whole document and never decides whether a claim is *true*, only whether it is *supported* by approved sources.
+LoomGuard checks a marketing draft against the company's brand guide and approved-facts sheet **before** it is published. It shows exactly which guide page or spreadsheet row each issue comes from, suggests small phrase-level fixes that keep the writer's wording, and sends the draft to a human manager for approval. It checks content. It never writes content and never approves anything by itself.
 
-This README is the working guide for the two of us building the Round 2 MVP. Read `ROADMAP.md` for the hour-by-hour plan.
+| | |
+|---|---|
+| Live app (frontend) | https://loomguard-kizuna.vercel.app/ |
+| Live API (backend) | https://loomguard-kizuna-6cra.onrender.com/ (interactive docs at `/docs`) |
+| Source code | https://github.com/lostmoon1513/loomguard-kizuna |
+| Team | Pradeep Sutrave (Team Lead, frontend and workflow) · Shruthi Pallemoni (backend, AI and evaluation) |
+| Institution | RGUKT Basar |
 
----
+> **Free hosting note:** the backend sleeps when idle. Open `/api/health` on the API link once and wait up to a minute before using the app.
 
-## 1. Who owns what
+## Try it in two minutes
 
-| | Pradeep Sutrave | Shruthi Pallemoni |
-|---|---|---|
-| Area | Frontend, workflow, UX, demo data | Backend, AI/RAG, data |
-| Folders | `frontend/`, `sample_kit/` | `backend/` |
-| Builds | Brand Setup UI, Review Studio (split-pane highlighter, issue cards), submit/approve flow, comments, Insights charts | FastAPI routes, Mongo schemas, PDF/DOCX parsing, Chroma indexing, rule checks, claim checker, Gemini tone check, status machine |
+1. Open the API link's `/api/health` once to wake the server.
+2. Open the app. In **Brand Setup**, load the demo kit (Aurora brand).
+3. In **Studio**, load a flawed demo draft and run the check.
+4. Click an issue to see the reason and its source (guide page or facts row). Accept a fix and watch it re-check.
+5. Try **Submit** while mandatory issues remain (it is blocked), fix or request exceptions, then submit.
+6. Switch to the **Manager** role to approve or request changes, then open **Insights**.
 
-**Rule:** only edit your own folder. If you need a change in the other's area, message them or open a short PR. Shared files (`README.md`, `ROADMAP.md`, `docs/contract.md`) are edited by either, in small commits.
+Example: *"Used by 10,000 teams in 60 countries"* is flagged CONTRADICTED. The approved facts say 500 teams (Row 3) and 32 countries (Row 9), and those values are offered as the fix.
 
-## 2. Repository layout
+## What it does
+
+- **Brand kit:** upload a guide PDF and an approved-facts CSV, edit banned and preferred terms, or load the demo kit.
+- **Draft intake:** paste text or upload Markdown, TXT, DOCX or text PDF.
+- **Checks:** banned and preferred terms, long sentences, claims against approved facts, prompt-injection scan, plus optional Gemini tone and claim checks.
+- **Claim states, decided by code:** `SUPPORTED`, `CONTRADICTED` (wrong number), `OUTDATED` (fact expired), `UNSUPPORTED` (no source: shown as *unverified*, never as *false*).
+- **Explainable:** every issue has a reason, a citation, a Rule/AI tag, a Mandatory/Advisory priority and a "needs human review" flag where relevant.
+- **Fix actions:** accept a fix, edit by hand, or request an exception. Every change triggers a full re-check.
+- **Workflow:** submit gate (HTTP 409 while mandatory issues are open), comments, manager-only decision (HTTP 403 for creators), status `DRAFT → IN_REVIEW → APPROVED`.
+- **Insights:** issues by category and claim state, most-triggered rules, exception counts, potentially unclear rules.
+- **Resilient:** if Gemini or MongoDB is unavailable, rule-based checks still run and the screen says why.
+
+## Architecture
 
 ```
-loomguard/
-├── README.md
-├── ROADMAP.md
-├── docs/
-│   ├── contract.md            # issue object + endpoint list (source of truth)
-│   └── changes_from_plan.md   # needed for the Round 2 form
-├── sample_kit/
-│   ├── brand_guide.pdf
-│   ├── approved_facts.csv
-│   └── drafts/                # flawed_1.md, flawed_2.md, flawed_3.md, clean.md
-├── backend/
-│   ├── app/
-│   │   ├── main.py            # FastAPI app, CORS, routers
-│   │   ├── config.py          # env loading
-│   │   ├── db.py              # Mongo client
-│   │   ├── schemas.py         # Pydantic models (Issue, Draft, Comment...)
-│   │   ├── routers/           # brand.py, drafts.py, reviews.py, insights.py
-│   │   ├── services/
-│   │   │   ├── parsing.py     # PDF / DOCX / MD -> text with offsets
-│   │   │   ├── indexing.py    # chunk PDF + CSV -> ChromaDB
-│   │   │   ├── rules_check.py # banned/preferred terms, readability (Python only)
-│   │   │   ├── claims_check.py# extract claims -> retrieve -> UNSUPPORTED_CLAIM
-│   │   │   ├── tone_check.py  # Gemini, phrase-only schema
-│   │   │   └── runner.py      # asyncio.gather over all checks
-│   ├── mocks/draft_response.json
-│   ├── tests/
-│   ├── requirements.txt
-│   └── .env.example
-└── frontend/
-    ├── src/
-    │   ├── pages/             # BrandSetup, Studio, ReviewQueue, Insights
-    │   ├── components/        # Highlighter, IssueCard, DiffView (R3), StatusBadge
-    │   ├── api/client.js
-    │   └── mocks/
-    ├── package.json
-    └── .env.example
+React app (Vercel)  ──►  FastAPI backend (Render)  ──►  MongoDB Atlas (optional, memory fallback)
+ Studio · Brand Setup       ingestion · hybrid search        └─►  Google Gemini (optional, validated)
+ Review Queue · Manager     rule engine · claim verifier
+ Insights                   Gemini checks + output guard
+                            workflow engine · insights
 ```
 
-## 3. Setup (both of us, once)
+Request flow for a draft: rules run first in Python → Gemini checks run in parallel (`asyncio`) → AI output is schema-validated and passed through the output guard → issues are merged, cited and stored → a fix re-runs the whole check.
 
-**Prerequisites:** Python 3.11+, Node 20+, Git, a Gemini API key (Google AI Studio), a MongoDB Atlas free cluster.
+### Main decisions
+
+| Decision | Why |
+|---|---|
+| Python rules first, AI second | Exact things (banned words, numbers, dates) must be repeatable. AI is for judgement such as tone. |
+| Code sets claim status and citations | Similarity cannot tell a wrong number from a right one; the model cannot invent a page number. |
+| Output guard on every AI reply | Phrase must exist verbatim, offsets computed by code, ≤ 3 similar-length replacements, no links or "approve" text. |
+| Own BM25 + numpy cosine + Reciprocal Rank Fusion | Small data, free hosts, fewer moving parts. Falls back to keyword-only without embeddings. |
+| Manager-only approval enforced in the API | Hiding a button is not security. |
+| Quota-aware AI client | On a 429 the client pauses Gemini for 10 minutes, reports the real reason, and the rules keep running. |
+
+## Tech stack
+
+- **Backend:** Python 3.11, FastAPI, Pydantic v2, Motor/PyMongo, pypdf, python-docx, numpy, rapidfuzz, textstat, google-genai, certifi
+- **AI:** Google Gemini. Generation model set by `GEMINI_MODEL` (currently `gemini-3.8-flash`), embeddings `gemini-embedding-001`
+- **Frontend:** React 19, Vite, Tailwind CSS, Lucide, Recharts
+- **Data/hosting:** MongoDB Atlas, Render (API), Vercel (app)
+- **Testing:** pytest, httpx
+
+## Run it locally
 
 ```bash
-git clone <repo-url> loomguard && cd loomguard
-```
-
-**Backend**
-```bash
-cd backend
+git clone https://github.com/lostmoon1513/loomguard-kizuna.git
+cd loomguard-kizuna/backend
 python -m venv .venv
-source .venv/bin/activate          # Windows: .venv\Scripts\activate
+.venv\Scripts\activate          # Windows;  source .venv/bin/activate on macOS/Linux
 pip install -r requirements.txt
-cp .env.example .env               # then fill in the values
+copy .env.example .env          # then edit .env (never commit it)
 uvicorn app.main:app --reload --port 8000
 ```
-Check: http://localhost:8000/docs should show the API docs.
 
-`.env` values:
-```
-GEMINI_API_KEY=
-MONGO_URI=
-MONGO_DB=loomguard
-CORS_ORIGINS=http://localhost:5173
-SIMILARITY_THRESHOLD=0.55
-```
+Open http://127.0.0.1:8000/docs for the API and http://127.0.0.1:8000/api/health for status. The backend also serves the built web app from `backend/web` at `/`.
 
-**Frontend**
-```bash
-cd frontend
-npm install
-cp .env.example .env               # VITE_API_URL=http://localhost:8000
-npm run dev
-```
-Open http://localhost:5173.
+To run the React app separately, go to the frontend folder, run `npm install` and `npm run dev`, and add its address to `CORS_ORIGINS`.
 
-**Never commit `.env` or API keys.** Add them to `.gitignore` before the first commit.
+### Environment variables (`backend/.env`)
 
-## 4. The contract (read this before writing code)
-
-The full version lives in `docs/contract.md`. Summary:
-
-**Issue object**
-```json
-{
-  "id": "iss_01",
-  "category": "TERMINOLOGY | TONE | CLAIM | READABILITY",
-  "severity": "high | medium | low",
-  "source": "python_rule | gemini",
-  "quote": "world's #1 platform",
-  "start": 128, "end": 148,
-  "reason": "Superlative claim has no match in the approved facts sheet.",
-  "citation": {"doc": "Approved Facts CSV", "ref": "Row 14"},
-  "suggested_fixes": ["a leading platform", "trusted by 500+ teams"],
-  "status": "open | accepted | edited | exception_requested"
-}
-```
-
-**Endpoints:** `POST /api/brand/upload`, `PUT /api/brand/terms`, `GET /api/brand`, `POST /api/drafts`, `GET /api/drafts/{id}`, `PATCH /api/drafts/{id}/issues/{iid}`, `POST /api/drafts/{id}/submit`, `POST /api/drafts/{id}/comments`, `POST /api/drafts/{id}/decision`, `GET /api/insights`.
-
-If either of us wants to change the contract, update `docs/contract.md` first and tell the other.
-
-## 5. How the checks work (the part judges will ask about)
-
-1. **Python first.** Banned/preferred terms, readability, and later HEX/WCAG are plain code. They are fast, repeatable, and work even if Gemini is down.
-2. **Two-step claim check.** Gemini only *extracts* claim spans (stats, prices, superlatives) from the draft. Our code then searches ChromaDB. If no retrieved chunk passes `SIMILARITY_THRESHOLD`, the claim is marked `UNSUPPORTED_CLAIM` by code, not by the model.
-3. **Citations from metadata.** Page numbers and CSV row ids come from chunk metadata. Gemini never writes a citation.
-4. **Phrase-only output.** The Pydantic schema accepts `original_phrase` and up to 3 `replacement_options`, so the model cannot return a rewritten document. Validate every response and drop anything that doesn't match the draft text.
-5. **Fail soft.** Gemini calls have a 10 s timeout and one retry. On failure, return the Python results plus an "AI check unavailable" notice.
-6. **Disclosure.** Every issue carries `source`, and the UI shows an "AI" or "Rule" tag.
-
-## 6. Working agreement
-
-**Git**
-- `main` is always deployable. Work on `feat/<name>` branches: `feat/brand-upload`, `feat/studio-highlighter`.
-- Commit small and often with clear messages. Judges can inspect commit history and timing, so steady commits from inside the build window matter.
-- Open a PR for anything touching the other person's folder; otherwise merge your own work after a quick self-check.
-- Pull `main` before starting each block.
-
-**Parallel work trick:** Shruthi commits `backend/mocks/draft_response.json` in the first couple of hours. Pradeep builds the Studio against it. Backend wiring then becomes swapping one import.
-
-**Sync points (10 minutes each):** Fri 9 AM, Fri 6 PM, Sat 9 AM, Sat 6 PM (full end-to-end run together).
-
-**Disclosure (required by the event rules):** note in the final PDF which parts used AI assistance, which libraries/templates were used, and that Gemini 2.5 Flash is the external AI service. Keep a running list in `docs/changes_from_plan.md`.
-
-## 7. MVP acceptance test (run on the deployed link)
-
-1. Open the app. The demo brand kit is already loaded (or click "Load demo kit").
-2. As Creator, upload `sample_kit/drafts/flawed_1.md` (or click "Try sample draft").
-3. Within about 15 seconds see highlighted issues: a banned term, an unsupported claim, a tone issue, each with a page/row citation and 2 to 3 fix options.
-4. Accept one fix: only that phrase changes. Request an exception on another with a note.
-5. Submit. Status becomes IN_REVIEW.
-6. Switch to Manager. Open the draft, add a comment, Approve. Status becomes APPROVED.
-7. Open Insights: counts by category appear.
-8. Upload `clean.md`: no (or almost no) issues.
-
-If all eight pass on the live link in an incognito window, you are ready to submit.
-
-## 8. Deployment
-
-| Part | Where | Notes |
+| Variable | Meaning | Default |
 |---|---|---|
-| Backend | Render or Railway | Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`. Set the `.env` values as service env vars. Free tiers sleep, so open the URL before any demo |
-| Frontend | Vercel or Netlify | Set `VITE_API_URL` to the backend URL. Update backend `CORS_ORIGINS` to the frontend URL |
-| Database | MongoDB Atlas M0 | Allow the host's IPs (or 0.0.0.0/0 for the hackathon) |
-| Vector store | ChromaDB inside the backend | Disk may reset on free hosting. Rebuild the index on startup from the chunks stored in Mongo |
+| `GEMINI_API_KEY` | Gemini key (optional; without it only rule checks run) | empty |
+| `GEMINI_MODEL` | Generation model | `gemini-3.8-flash` |
+| `GEMINI_EMBED_MODEL` | Embedding model | `gemini-embedding-001` |
+| `GEMINI_TIMEOUT_SECONDS` | Per-call timeout | `25` |
+| `MONGO_URI`, `MONGO_DB` | MongoDB Atlas (optional; memory fallback) | empty, `loomguard` |
+| `CORS_ORIGINS` | Allowed frontend origins | `http://localhost:5173` |
+| `AUTOLOAD_DEMO` | Load the demo kit at start-up | `true` |
+| `MAX_UPLOAD_MB` | Upload limit | `10` |
 
-Deploy the backend by Saturday afternoon at the latest. A working local build does not score; the link does.
+For MongoDB Atlas, allow the host's IP in *Network Access* (Render IPs change, so `0.0.0.0/0` is used for the demo). Never commit `.env`.
 
-## 9. Round 2 submission checklist
+## Main API routes
 
-The form: https://forms.gle/gyRiHtQT3AnC3MdV6 (window closes **Sun 25 Oct, 10:00 AM IST**).
+| Method and path | Purpose |
+|---|---|
+| `GET /api/health`, `GET /api/health/gemini` | Service status; real Gemini error text for setup problems |
+| `POST /api/brand/upload`, `POST /api/brand/load-demo`, `PUT /api/brand/terms` | Create the brand kit |
+| `GET /api/brand`, `GET /api/brand/search` | Read the kit; hybrid search over rules and facts |
+| `POST /api/drafts`, `GET /api/drafts`, `GET /api/drafts/{id}` | Check and read drafts |
+| `PATCH /api/drafts/{id}/issues/{issue_id}` | Accept, edit or request an exception |
+| `POST /api/drafts/{id}/recheck`, `/submit`, `/comments`, `/decision` | Workflow (decision is manager-only, header `X-Role: manager`) |
+| `GET /api/insights` | Governance aggregates |
+| `GET /api/demo/drafts` | Sample flawed and clean drafts |
 
-- [ ] Working project link (tested in incognito)
-- [ ] Source-code repository link (public or judge-accessible)
-- [ ] Updated project PDF (architecture, workflow, screenshots, what was built)
-- [ ] List of completed features
-- [ ] Technology and implementation details
-- [ ] Changes made from the original plan (`docs/changes_from_plan.md`)
-- [ ] Three major Round 3 improvements (see `ROADMAP.md` section 8)
+All errors share one shape: `{"error": {"code": "...", "message": "..."}}`.
 
-## 10. Round 3 improvements (planned)
+## Tests and evaluation
 
-1. **Image banner and WCAG checker:** K-Means dominant colours, delta-E against brand palette, WCAG 2.1 contrast, Gemini Vision layout checks.
-2. **Revision history, diff view and exception waivers:** versioned drafts, word-level side-by-side diff, manager grant/deny of exceptions with a recorded reason.
-3. **Governance insights and local data masking:** mask confidential codenames before any AI call, flag "Potentially Unclear" rules from repeated violations and exceptions, export a compliance summary.
+```bash
+cd backend
+pytest tests -q                  # 47 tests
+python -m evals.run_evals        # writes evals/results.md and results.json
+```
 
-## 11. Known limits (be honest in the PDF)
+Results on 56 labelled drafts (39 issues, 23 clean drafts), rule-based checks only:
 
-- Scanned/image-only PDFs are not supported in Round 2 (text PDFs only).
-- Roles are simplified (role switch or seeded users), not full authentication.
-- LoomGuard checks whether a claim is *supported by approved sources*, not whether it is true in the world.
-- A human always makes the final approval decision.
+| System | Precision | Recall | False alarms on clean drafts |
+|---|---|---|---|
+| A: generic checker (no brand kit) | 100% | 18% | 0 of 23 |
+| B: brand kit + retrieval only | 100% | 46% | 0 of 23 |
+| **C: full LoomGuard** | **100%** | **100%** | **0 of 23** |
+
+Claim status 22/22, citations 23/23, retrieval Hit@3 97% (keyword mode), prompt-injection scan caught 8 of 8 attacks and flagged 0 of 6 harmless texts. A second, independent brand kit (NexusPay) was run end to end as a check.
+
+**Limits:** the test set is small and written by the team, and AI checks are not in these numbers. See `backend/evals/results.md` for what the evaluation found and fixed.
+
+## Project layout
+
+```
+backend/
+  app/            FastAPI app: routers/, services/ (rules, claims, retrieval, Gemini, workflow), schemas, config
+  demo_kit/       Aurora demo brand guide PDF, facts CSV, terms, sample drafts
+  evals/          golden sets, run_evals.py, results.md
+  tests/          pytest suites
+  web/            built web app served by the backend
+docs/             contract, deploy notes, changes from plan, user feedback
+render.yaml       Render blueprint
+```
+
+## Changes from the Round 1 plan
+
+pypdf instead of PyMuPDF · own BM25 + numpy + RRF instead of ChromaDB · four code-decided claim states instead of similarity only · `asyncio` instead of LangGraph · role switch instead of login · Gemini model name is now a setting. Added: prompt-injection scan, AI output guard, evaluation harness, quota-aware fallbacks. Details in `docs/changes_from_plan.md`.
+
+## Round 3 plan
+
+1. **Image and banner checker with WCAG** (K-Means colours, CIEDE2000 against the palette, 4.5:1 contrast, Gemini Vision for layout).
+2. **Revision history, diff view and exception waivers** with real sign-in (Creator, Manager, Compliance Reviewer).
+3. **Governance insights over time and local sensitive-data masking** before any AI call.
+
+## Known limitations
+
+Text only in Round 2 · text PDFs only · AI checks depend on Gemini quota · unusual claim phrasing can be missed · simplified roles (no sign-in yet) · free hosting sleeps and in-memory drafts are lost on restart if MongoDB is unreachable.
+
+## Responsible use and disclosure
+
+- Only the draft text being checked is sent to Gemini. Keys live in environment variables.
+- AI-found issues are labelled **AI**; rule-based issues are labelled **Rule**. Humans make the final decision.
+- Built with assistance from Claude (Anthropic) and ChatGPT for drafting and planning; the team ran, tested and reviewed all code. Runtime AI is Google Gemini. No code was reused from earlier projects. All data was created during the build window.
+
+## Team
+
+| Member | Contribution |
+|---|---|
+| Pradeep Sutrave (Team Lead) | React web app (Studio, Brand Setup, Review Queue, Manager decision, Insights), Vercel deployment, user testing |
+| Shruthi Pallemoni | FastAPI backend, brand-kit parsing and hybrid retrieval, rule and claim engine, Gemini checks and guards, evaluation and tests, Render deployment |
