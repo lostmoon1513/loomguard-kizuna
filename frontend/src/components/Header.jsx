@@ -1,7 +1,7 @@
-
 import { useEffect, useState } from 'react';
-import { Bell, CircleHelp, X } from 'lucide-react';
+import { Bell, CircleHelp, LoaderCircle, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
+import { getHealth } from '../api/drafts.js';
 
 const titles = {
   '/studio': [
@@ -34,6 +34,7 @@ export default function Header({ role, setRole }) {
   );
 
   const [showHelp, setShowHelp] = useState(false);
+  const [backendStatus, setBackendStatus] = useState('checking'); // 'checking' | 'online' | 'waking'
 
   const [title, subtitle] = titles[location.pathname] || [
     'LoomGuard',
@@ -43,6 +44,31 @@ export default function Header({ role, setRole }) {
   useEffect(() => {
     localStorage.setItem('loomguard-user', user);
   }, [user]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer = null;
+
+    const check = () => {
+      getHealth()
+        .then(() => {
+          if (!cancelled) setBackendStatus('online');
+        })
+        .catch(() => {
+          if (!cancelled) {
+            setBackendStatus('waking');
+            timer = setTimeout(check, 5000);
+          }
+        });
+    };
+
+    check();
+
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
 
   const changeRole = (next) => {
     setRole(next);
@@ -69,6 +95,27 @@ export default function Header({ role, setRole }) {
 
       {/* Right: controls */}
       <div className="flex flex-wrap items-center gap-2">
+        {/* Render Free Tier Backend Status Pill */}
+        {backendStatus === 'waking' && (
+          <div
+            className="flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-800 shadow-sm"
+            title="Render free tier services sleep after 15m of inactivity and need ~45-50s to wake up on first visit."
+          >
+            <LoaderCircle className="h-3.5 w-3.5 animate-spin text-amber-600 shrink-0" />
+            <span>Waking up backend (~45s)...</span>
+          </div>
+        )}
+
+        {backendStatus === 'online' && (
+          <div
+            className="hidden sm:flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/70 px-2.5 py-1.5 text-xs font-medium text-emerald-700"
+            title="Backend server connected and operational"
+          >
+            <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0"></span>
+            <span>Live</span>
+          </div>
+        )}
+
         {/* Role pill switcher */}
         <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1 gap-1">
           {['creator', 'manager'].map((r) => (
