@@ -14,7 +14,7 @@ def _list(value: str) -> list[str]:
 @dataclass(frozen=True)
 class Settings:
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
-    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-3.8-flash")
     gemini_embed_model: str = os.getenv("GEMINI_EMBED_MODEL", "gemini-embedding-001")
     mongo_uri: str = os.getenv("MONGO_URI", "")
     mongo_db: str = os.getenv("MONGO_DB", "loomguard")
