@@ -134,7 +134,7 @@ Claim status 22/22, citations 23/23, retrieval Hit@3 97% (keyword mode), prompt-
 
 ### Second brand kit: NexusPay (independent test)
 
-The `NexusPay kit/` folder holds a second, made-up brand (an enterprise cross-border payments network) so LoomGuard can be checked on a brand we did not tune the rules for. It has its own 6-page guide PDF, 12 approved facts (including an expired fee), its own banned and preferred terms, and sample drafts.
+The `nexuspay_kit/` folder holds a second, made-up brand (an enterprise cross-border payments network) so LoomGuard can be checked on a brand we did not tune the rules for. It has its own 6-page guide PDF, 12 approved facts (including an expired fee), its own banned and preferred terms, and sample drafts.
 
 | File | Purpose |
 |---|---|
@@ -149,7 +149,7 @@ The `NexusPay kit/` folder holds a second, made-up brand (an enterprise cross-bo
 **Run it** (start the backend first with `uvicorn app.main:app --port 8000`, then from the repo root):
 
 ```bash
-python "NexusPay kit/test_pipeline.py"
+python "nexuspay_kit/test_pipeline.py"
 ```
 
 It loads the NexusPay kit, checks the flawed drafts, accepts a fix, requests an exception, confirms the submit gate returns 409, confirms a creator cannot approve (403), approves as a manager, checks that the clean draft has 0 issues, and reads the insights. Note: this replaces the active brand kit on the server it runs against, so use it on a local or test server. Reload the Aurora demo kit afterwards (`POST /api/brand/load-demo`).
