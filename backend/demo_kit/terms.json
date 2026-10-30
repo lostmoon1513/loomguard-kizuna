@@ -1,14 +1,54 @@
 {
   "banned": [
-    {"term": "revolutionary", "reason": "Unqualified hype word"},
-    {"term": "world-class", "reason": "Unqualified hype word"},
-    {"term": "best-in-class", "reason": "Unsupported superlative"},
-    {"term": "cutting-edge", "reason": "Unqualified hype word"},
-    {"term": "guaranteed", "reason": "Outcome guarantees are prohibited"}
+    {
+      "term": "revolutionary",
+      "reason": "Unqualified hype word"
+    },
+    {
+      "term": "world-class",
+      "reason": "Unqualified hype word"
+    },
+    {
+      "term": "best-in-class",
+      "reason": "Unsupported superlative"
+    },
+    {
+      "term": "cutting-edge",
+      "reason": "Unqualified hype word"
+    },
+    {
+      "term": "guaranteed",
+      "reason": "Outcome guarantees are prohibited"
+    }
   ],
   "preferred": [
-    {"avoid": "utilize", "use": "use"},
-    {"avoid": "users", "use": "customers"}
+    {
+      "avoid": "utilize",
+      "use": "use"
+    },
+    {
+      "avoid": "users",
+      "use": "customers"
+    }
   ],
-  "hex_codes": ["#1F4FD8", "#2B2F3A", "#2ED3A3", "#C8102E"]
+  "hex_codes": [
+    "#1F4FD8",
+    "#2B2F3A",
+    "#2ED3A3",
+    "#C8102E"
+  ],
+  "confidential": [
+    {
+      "term": "Project Falcon",
+      "kind": "codename"
+    },
+    {
+      "term": "Orion Bank",
+      "kind": "customer"
+    },
+    {
+      "term": "Helix",
+      "kind": "codename"
+    }
+  ]
 }

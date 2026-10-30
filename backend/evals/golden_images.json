@@ -1,0 +1,120 @@
+{
+  "sharma_benchmark_pairs": [
+    {"lab1": [50.0, 2.6772, -79.7751], "lab2": [50.0, 0.0, -82.7485], "expected_de": 2.0425},
+    {"lab1": [50.0, 3.1571, -77.2803], "lab2": [50.0, 0.0, -82.7485], "expected_de": 2.8615},
+    {"lab1": [50.0, 2.8361, -74.0200], "lab2": [50.0, 0.0, -82.7485], "expected_de": 3.4412},
+    {"lab1": [50.0, -1.3802, -84.2814], "lab2": [50.0, 0.0, -82.7485], "expected_de": 1.0000},
+    {"lab1": [50.0, -1.1848, -84.8006], "lab2": [50.0, 0.0, -82.7485], "expected_de": 1.0000},
+    {"lab1": [50.0, -0.9009, -85.5211], "lab2": [50.0, 0.0, -82.7485], "expected_de": 1.0000},
+    {"lab1": [50.0, 0.0, 0.0], "lab2": [50.0, -1.0, 2.0], "expected_de": 2.3669},
+    {"lab1": [50.0, -1.0, 2.0], "lab2": [50.0, 0.0, 0.0], "expected_de": 2.3669},
+    {"lab1": [50.0, 2.5, 0.0], "lab2": [50.0, 0.0, -2.5], "expected_de": 4.3065},
+    {"lab1": [50.0, 2.5, 0.0], "lab2": [73.0, 25.0, -18.0], "expected_de": 27.1492},
+    {"lab1": [50.0, 2.5, 0.0], "lab2": [61.0, -5.0, 29.0], "expected_de": 22.8977},
+    {"lab1": [50.0, 2.5, 0.0], "lab2": [56.0, -27.0, -3.0], "expected_de": 31.9030},
+    {"lab1": [50.0, 2.5, 0.0], "lab2": [58.0, 24.0, 15.0], "expected_de": 19.4535},
+    {"lab1": [50.0, 2.5, 0.0], "lab2": [50.0, 3.1736, 0.5854], "expected_de": 1.0000},
+    {"lab1": [60.2574, -34.0099, 36.2677], "lab2": [60.4626, -34.1751, 39.4387], "expected_de": 1.2644},
+    {"lab1": [63.0109, -31.0961, -5.8663], "lab2": [62.8187, -29.7946, -4.0864], "expected_de": 1.2630},
+    {"lab1": [35.0831, -44.1164, 3.7933], "lab2": [35.0232, -40.0716, 1.5901], "expected_de": 1.8645},
+    {"lab1": [22.7233, 20.0904, -46.6940], "lab2": [23.0331, 14.9730, -42.5619], "expected_de": 2.0373},
+    {"lab1": [36.4612, 47.8580, 18.3852], "lab2": [36.2715, 50.5065, 21.2231], "expected_de": 1.4146},
+    {"lab1": [90.8027, -2.0831, 1.4410], "lab2": [91.1528, -1.6435, 0.0447], "expected_de": 1.4441},
+    {"lab1": [90.9257, -0.5406, -0.9208], "lab2": [88.6381, -0.8985, -0.7239], "expected_de": 1.5381},
+    {"lab1": [6.7747, -0.2908, -2.4247], "lab2": [5.8714, -0.0985, -2.2286], "expected_de": 0.6377},
+    {"lab1": [2.0776, 0.0795, -1.1350], "lab2": [0.9033, -0.0636, -0.5514], "expected_de": 0.9082}
+  ],
+  "wcag_contrast_cases": [
+    {
+      "name": "black on white",
+      "fg": [0, 0, 0],
+      "bg": [255, 255, 255],
+      "expected_ratio": 21.0,
+      "passes_normal": true,
+      "passes_large": true
+    },
+    {
+      "name": "white on black",
+      "fg": [255, 255, 255],
+      "bg": [0, 0, 0],
+      "expected_ratio": 21.0,
+      "passes_normal": true,
+      "passes_large": true
+    },
+    {
+      "name": "identical colors (zero contrast)",
+      "fg": [128, 128, 128],
+      "bg": [128, 128, 128],
+      "expected_ratio": 1.0,
+      "passes_normal": false,
+      "passes_large": false
+    },
+    {
+      "name": "mid-grey on white (standard WCAG border case)",
+      "fg": [118, 118, 118],
+      "bg": [255, 255, 255],
+      "expected_ratio": 4.54,
+      "passes_normal": true,
+      "passes_large": true
+    },
+    {
+      "name": "light grey on white (fails normal, passes large)",
+      "fg": [148, 148, 148],
+      "bg": [255, 255, 255],
+      "expected_ratio": 3.03,
+      "passes_normal": false,
+      "passes_large": true
+    },
+    {
+      "name": "brand blue #1F4FD8 on white",
+      "fg": [31, 79, 216],
+      "bg": [255, 255, 255],
+      "expected_ratio": 6.63,
+      "passes_normal": true,
+      "passes_large": true
+    },
+    {
+      "name": "yellow on white (severe contrast failure)",
+      "fg": [255, 255, 0],
+      "bg": [255, 255, 255],
+      "expected_ratio": 1.07,
+      "passes_normal": false,
+      "passes_large": false
+    }
+  ],
+  "palette_matching_cases": [
+    {
+      "name": "exact brand blue",
+      "hex": "#1F4FD8",
+      "brand_hexes": ["#1F4FD8", "#0B1536"],
+      "expected_match": true,
+      "max_delta_e": 0.01
+    },
+    {
+      "name": "near brand blue (perceptual match < 6.0)",
+      "hex": "#2051DC",
+      "brand_hexes": ["#1F4FD8"],
+      "expected_match": true,
+      "max_delta_e": 3.0
+    },
+    {
+      "name": "off-brand orange",
+      "hex": "#FF8800",
+      "brand_hexes": ["#1F4FD8", "#0B1536"],
+      "expected_match": false,
+      "min_delta_e": 20.0
+    },
+    {
+      "name": "pure white neutral (ignored by rule)",
+      "hex": "#FFFFFF",
+      "brand_hexes": ["#1F4FD8"],
+      "is_neutral": true
+    },
+    {
+      "name": "dark grey neutral (ignored by rule)",
+      "hex": "#333333",
+      "brand_hexes": ["#1F4FD8"],
+      "is_neutral": true
+    }
+  ]
+}

@@ -7,7 +7,7 @@ Category = Literal["TERMINOLOGY", "TONE", "CLAIM", "READABILITY", "SECURITY"]
 ClaimStatus = Literal["SUPPORTED", "CONTRADICTED", "OUTDATED", "UNSUPPORTED"]
 Severity = Literal["high", "medium", "low"]
 IssueSource = Literal["python_rule", "gemini", "gemini+python"]
-IssueStatus = Literal["open", "accepted", "edited", "exception_requested"]
+IssueStatus = Literal["open", "accepted", "edited", "exception_requested", "waived"]
 DraftStatus = Literal["CHECKING", "DRAFT", "IN_REVIEW", "APPROVED", "CHANGES_REQUESTED"]
 Priority = Literal["mandatory", "advisory"]
 
@@ -34,6 +34,7 @@ class Issue(BaseModel):
     priority: Priority = "advisory"
     status: IssueStatus = "open"
     exception_note: Optional[str] = None
+    waiver: Optional[dict] = None  # {state: granted|denied, by, role, at, reason}
 
     @model_validator(mode="after")
     def _offsets_ordered(self):

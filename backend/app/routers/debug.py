@@ -1,7 +1,8 @@
 """Temporary endpoint so Steps 5-7 can be tested before the full draft pipeline (Step 8)."""
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from ..deps import require_roles
 from ..services import store
 from ..services.claims_check import run_claims_check, verify_extra_phrases
 from ..services.demo import demo_drafts
@@ -10,7 +11,7 @@ from ..services.issues import finalize
 from ..services.llm_claims import extract_claim_phrases
 from ..services.rules_check import run_rules_check
 
-router = APIRouter(prefix="/api/debug", tags=["debug"])
+router = APIRouter(prefix="/api/debug", tags=["debug"], dependencies=[Depends(require_roles("manager"))])
 
 
 class TextIn(BaseModel):

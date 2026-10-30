@@ -1,0 +1,103 @@
+{
+  "sensitive_cases": [
+    {
+      "id": "m01",
+      "text": "Contact project lead at sarah.connor@cyberdyne.org for access to Project Aegis.",
+      "expected_kinds": ["email", "confidential"],
+      "terms": {"confidential": [{"term": "Project Aegis", "kind": "codenames"}]}
+    },
+    {
+      "id": "m02",
+      "text": "Customer billing card 4111 1111 1111 1111 charged for subscription.",
+      "expected_kinds": ["card"],
+      "terms": {}
+    },
+    {
+      "id": "m03",
+      "text": "Test mastercard 5555-5555-5555-4444 on account.",
+      "expected_kinds": ["card"],
+      "terms": {}
+    },
+    {
+      "id": "m04",
+      "text": "Google API key is AIzaSyA1234567890abcdefghijklmnopqrstuv and OpenAI key is sk-proj-1234567890abcdefghijklmnopqrstuv.",
+      "expected_kinds": ["key", "key"],
+      "terms": {}
+    },
+    {
+      "id": "m05",
+      "text": "GitHub token ghp_1234567890abcdefghijklmnopqrstuvwxyzAB leaked.",
+      "expected_kinds": ["key"],
+      "terms": {}
+    },
+    {
+      "id": "m06",
+      "text": "Call support at 555-234-5678 or India desk +91 98765 43210 immediately.",
+      "expected_kinds": ["phone", "phone"],
+      "terms": {}
+    },
+    {
+      "id": "m07",
+      "text": "Session token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+      "expected_kinds": ["key"],
+      "terms": {}
+    },
+    {
+      "id": "m08",
+      "text": "Confidential partner NexusPay entered agreement under codename Project Titan.",
+      "expected_kinds": ["confidential", "confidential"],
+      "terms": {"confidential": [{"term": "NexusPay", "kind": "partner"}, {"term": "Project Titan", "kind": "codenames"}]}
+    },
+    {
+      "id": "m09",
+      "text": "Service token AQ.0123456789abcdefghijklmnopqrstuvwxyz and backup key sk-test-1234567890abcdefghijklmnopqrstuv.",
+      "expected_kinds": ["key", "key"],
+      "terms": {}
+    },
+    {
+      "id": "m10",
+      "text": "Reach john_doe.marketing+lead@aurora-cloud.io about enterprise tier.",
+      "expected_kinds": ["email"],
+      "terms": {}
+    }
+  ],
+  "benign_cases": [
+    {
+      "id": "b01",
+      "text": "Founded in 2019, Aurora offers 99.99% uptime for 10,000 teams across 5 global regions.",
+      "must_not_mask": ["2019", "99.99%", "10,000", "5"]
+    },
+    {
+      "id": "b02",
+      "text": "Pricing starts at $24 per month with a 14-day trial and 40% discount on annual plans.",
+      "must_not_mask": ["$24", "14-day", "40%"]
+    },
+    {
+      "id": "b03",
+      "text": "Average latency is 12ms and peak throughput exceeded 500,000 requests per second.",
+      "must_not_mask": ["12ms", "500,000"]
+    },
+    {
+      "id": "b04",
+      "text": "Release v2.4.1 fixes issue #1042 and updates section 4.5 of documentation.",
+      "must_not_mask": ["v2.4.1", "#1042", "4.5"]
+    },
+    {
+      "id": "b05",
+      "text": "Invalid card format 1234-5678-9012-3456 must not match Luhn checksum.",
+      "must_not_mask": ["1234-5678-9012-3456"]
+    }
+  ],
+  "roundtrip_cases": [
+    {
+      "id": "rt01",
+      "text": "Please email John.Smith@AcmeCorp.COM or call 555-019-2834 regarding card 4111 1111 1111 1111.",
+      "terms": {}
+    },
+    {
+      "id": "rt02",
+      "text": "Deploying Project Chimera using AIzaSyFakeTokenKey12345678901 under NexusPay.",
+      "terms": {"confidential": [{"term": "Project Chimera"}, {"term": "NexusPay"}]}
+    }
+  ]
+}

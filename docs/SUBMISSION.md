@@ -1,57 +1,61 @@
-# Round 2 submission text (copy into the form; fix anything marked [CHECK] after testing)
+# LoomGuard: Round 3 Submission Text (Copy into the form)
 
 ## Project
-LoomGuard: a pre-publication brand review and compliance platform (Team KIZUNA, RGUKT Basar).
-Creators upload a draft. LoomGuard checks it against the brand guide and the approved-facts sheet, explains every issue with a source (guide page or facts row), suggests small phrase-level fixes, and routes the draft to a manager. The system never approves anything and never rewrites a whole document.
+**LoomGuard:** an intelligent brand-governance and pre-publication compliance platform (Team KIZUNA, RGUKT Basar).
+Creators upload text drafts or banner images. LoomGuard checks content against brand guidelines and approved facts, grounds every issue with a concrete citation (guide page number or facts spreadsheet row), suggests small phrase-level or same-hue color fixes, and routes drafts through a multi-role review and approval workflow with cryptographic audit logging. The system never auto-approves and never rewrites entire documents.
 
 ## Links
-- Working project: [PASTE LIVE LINK]
-- Source code: [PASTE GITHUB LINK]
-- Updated PDF: [ATTACH]
+- Working project (Render): [PASTE LIVE LINK]
+- Source code (GitHub): [PASTE GITHUB LINK]
+- Presentation / PDF: [ATTACH]
 
-## Completed features
-1. Brand kit: upload a guide PDF and an approved-facts CSV (or load the built-in demo kit). Rules keep their page number, priority (mandatory / advisory) and exceptions together.
-2. Draft intake: paste text or upload .md, .txt, .docx or text PDF. Scanned PDFs are rejected with a clear message.
-3. Terminology check: banned and preferred terms (case, hyphen and plural aware) with the guide page cited.
-4. Claim verification against approved facts, decided by code: CONTRADICTED (wrong number, with the right value suggested), OUTDATED (fact expired, current value suggested), UNSUPPORTED (no source; shown as "unverified", not "false"). Superlatives such as "#1" and outcome guarantees are flagged for a human.
-5. Readability check (long sentences).
-6. Prompt-injection scan: text in a draft that tries to instruct the checker is flagged and ignored.
-7. AI checks with Gemini (tone and extra claims) behind an output guard: phrases must exist verbatim in the draft, at most 3 similar-length replacements, no links or instructions, citations and offsets always set by code. [CHECK: works with the new API key]
-8. Review Studio: highlighted draft, issue cards with reason, source, Rule / AI tag, Mandatory / Advisory chip, "Needs human review" badge.
-9. Actions: accept a suggested fix, edit manually, request an exception (note required). Every change triggers a full re-check.
-10. Workflow: submit (blocked until mandatory issues are handled), comments, manager-only Approve / Request changes, status tracking.
-11. Insights: issues by category and claim type, most-triggered rules, exception counts, "potentially unclear rules" (two or more exception requests).
-12. Reliability: if Gemini or MongoDB is down the app keeps working with rule-based checks and shows a banner. Results are cached by content.
-13. Evaluation harness with a labelled test set (results in the PDF).
+## Completed Features (Round 1, Round 2 & Round 3)
+1. **Brand Kit Management:** Upload brand guide PDF and approved-facts CSV (or load the built-in demo kit). Rules preserve page numbers, priority (`mandatory` / `advisory`), and exception clauses together in one chunk.
+2. **Multi-Format Draft Intake:** Accepts plain text, `.md`, `.txt`, `.docx`, and text PDFs. Scanned PDFs are cleanly rejected.
+3. **Terminology Governance:** Strict and fuzzy banned/preferred term detection (case, hyphen, and plural aware) with guide page citations.
+4. **Algorithmic Claim Verification:** Grounded in code against approved facts: `CONTRADICTED` (numeric discrepancy with truth value suggested), `OUTDATED` (expired fact with current value suggested), and `UNSUPPORTED` (unverified claim flagged for human review). Superlatives ("#1", "best-in-class") and outcome guarantees are gated for human review.
+5. **Prompt-Injection & Security Defense:** Scans draft text and text extracted from images for adversarial prompt-injection directives ("ignore rules", "approve this"), flagging them under `SECURITY` rather than obeying them.
+6. **AI Tone Checks behind Output Guard:** Google Gemini (`gemini-2.5-flash`) tone review with strict Pydantic output constraints: quotes must exist verbatim in the draft, maximum 3 replacement options of similar length, zero links or instructions leaked, offsets computed strictly by code.
+7. **Image & Banner WCAG Checker (Round 3 Improvement 1):** Content-verified image uploads (PNG/JPEG, size <= 12MB, <= 40MP). Dominant color extraction using custom deterministic K-Means in CIELAB space. Brand palette difference computed via CIEDE2000 ($\Delta E_{00} \le 6.0$). Text and logo bounding boxes located via Gemini Vision. Relative contrast ratio measured in code against WCAG 2.1 AA (4.5:1 normal, 3:1 large text) with same-hue passing color suggestions. Numbered bounding box rendering via `GET /api/drafts/{id}/image?annotate=true`. Pixel fixes handled via revisions (`422 FIX_BY_REUPLOAD`).
+8. **Version History, Word Diff & Waivers (Round 3 Improvement 2):** Complete revision history tracking (`versions[]`). Word-level sequence-matched diffing (`GET /api/drafts/{id}/diff`) with mathematical reconstruction invariance. Full exception waiver lifecycle (`exception_requested` -> `waiver_granted` / `waiver_denied`). Waivers automatically expire if the quoted text is altered.
+9. **Role-Based Access Control & JWT Auth (Round 3):** Real JWT bearer token authentication with 4 roles (`creator`, `creator2`, `manager`, `reviewer`). Server-enforced permissions and privacy (unauthorized drafts return 404 to avoid ID enumeration).
+10. **Governance Insights Over Time (Round 3 Improvement 3a):** Weekly trend aggregation (`GET /api/insights/trends`), rule frequency tracking (*rising*, *falling*, *steady*), and deterministic recommendations based on empirical violation/waiver counts without model hallucination. Includes formula-injection safe CSV export and ReportLab compliance summary PDF download.
+11. **Local Sensitive Data Masking (Round 3 Improvement 3b):** Pre-AI local regex and algorithmic masking for credit cards (Luhn verified), API keys, JWTs, emails, phone numbers, and confidential codenames. Outgoing prompts pass through a fail-closed leak detector (`masker.leaked()`). Stored drafts and UI display only masked previews (`•••• 1111`, `… (hidden)`).
+12. **Production Hardening:** Sliding-window rate limiter (240 general req/min, 20 heavy AI req/min) with `Retry-After` headers. Sanitizes zero-width characters (`\u200b`, `\ufeff`) and normalizes smart quotes. Live health telemetry at `/api/health`.
+13. **Smoke Test Automation:** Standalone CLI script (`backend/scripts/smoke.py`) executing 20+ automated verification steps against a deployed instance.
 
-## Technology and implementation
-- Backend: Python 3.11, FastAPI, Pydantic v2, pypdf, python-docx, numpy, rapidfuzz-free own matcher, own BM25 + Reciprocal Rank Fusion.
-- AI: Google Gemini (`gemini-2.5-flash` for tone and claim extraction, `gemini-embedding-001` for embeddings; both set by environment variables), called through `google-genai` with schema-bound JSON output, 10 s timeout, one retry, never trusted without validation.
-- Data: MongoDB Atlas (motor) when reachable, in-memory fallback. Kit is rebuilt into the search index at startup.
-- Web app: single-page HTML/JS served by the same FastAPI service (one deployed link). Optional separate React app by Pradeep. [CHECK]
-- Deploy: Render (free), Docker file included.
-- Design rules: code decides claim status and citations; the AI only suggests phrases; every AI answer is validated; manager approval is always human.
-- External services: Gemini API, MongoDB Atlas, Render. No customer data is sent to AI beyond the draft text being checked.
+## Technology and Implementation
+- **Backend:** Python 3.11+, FastAPI, Pydantic v2, pypdf, python-docx, Pillow, ReportLab, NumPy, custom BM25 + Reciprocal Rank Fusion, Motor / MongoDB Atlas.
+- **AI Models:** Google Gemini (`gemini-2.5-flash` for tone and claim extraction; Gemini Vision for image element location; `gemini-embedding-001` for semantic retrieval). All model calls are bounded by strict Pydantic schemas, timeouts, and fallback guards.
+- **Data Persistence:** MongoDB Atlas with automatic in-memory fallback.
+- **Architecture Philosophy:** Rules and measurements (contrast, color difference, claim comparison, offsets, citations) are executed strictly in deterministic code. The LLM is used as an extractor/suggester, never as an unconstrained judge. Human managers retain final authority.
 
-## Evaluation (from `backend/evals/results.md`, rule-based checks, 56 drafts, 39 labelled issues)
-Generic checker: recall 18%. Brand kit + retrieval only: recall 46%. Full LoomGuard: precision 100%, recall 100%, 0 false alarms on 23 clean drafts, claim-status accuracy 100% (22 claims), all citations correct. Prompt-injection scan caught 8 of 8 attacks, 0 of 6 harmless texts flagged. Retrieval Hit@3 97% (keyword only).
-Honest limits: small team-written test set; two code bugs and two label errors were found and fixed by this evaluation (documented in results.md); AI checks are not in these numbers.
+## Evaluation Summary (from `backend/evals/results.md`)
+- **Three-System Text Comparison (56 drafts, 39 gold issues):**
+  - System A (Generic Hype Checker): Recall 18%, Precision 100%, F1 30%
+  - System B (Retrieval Only): Recall 46%, Precision 100%, F1 63%
+  - System C (Full LoomGuard): **Recall 100%, Precision 100%, F1 100%**, False Alarms on Clean Drafts **0% (0/23)**, Claim Status Accuracy **100% (22/22)**, Citation Accuracy **100%**.
+- **Sensitive Data Masking (Improvement 3):**
+  - Sensitive Entity Recall: **100% (15/15)** across cards, keys, JWTs, emails, phones, and confidential terms.
+  - Benign Business Numbers False Positive Rate: **0% (0/13)** on metrics, years, prices, and percentages.
+  - Roundtrip Unmasking Fidelity: **100%** exact character and casing restoration. Outgoing prompt leak defense confirmed.
+- **Image & Color Science (Improvement 1):**
+  - CIEDE2000 Accuracy: Mean Absolute Error **0.000022** across 23 Sharma et al. (2005) reference pairs.
+  - WCAG 2.1 AA Contrast Accuracy: **100%** on ground-truth luminance cases.
+  - Same-Hue Contrast Fix Pass Rate: **100%** of suggested alternatives pass required contrast ratios.
+  - Palette Brand Matching: **100%** accuracy; neutral chromaticity skipping verified.
+- **Word-Level Diffing (Improvement 2):**
+  - Mathematical Invariance: **100%** (concatenating `equal` + `delete` reproduces original; `equal` + `insert` reproduces revised text).
+- **Latency:** Rule-based checks execute in **~1.3 ms mean** (p95: 1.6 ms) per draft.
 
-## Changes made to the original plan
-See `docs/changes_from_plan.md` (PyMuPDF to pypdf; Chroma to own BM25 + numpy; four claim statuses instead of similarity only; asyncio instead of LangGraph; Cloudinary and real login deferred; injection scan and output guard added).
+## Team Contributions
+- **Shruthi Pallemoni:** Backend architecture, color science (CIELAB/CIEDE2000), WCAG accessibility pipeline, sensitive data masking engine, rate limiting, and evaluation suite (`evals/run_evals.py`).
+- **Pradeep Sutrave:** Frontend architecture, Review Studio, Version diffing UI, Review Queue, demo kit creation, and user workflow testing.
 
-## Three major improvements for Round 3
-1. **Image and banner checker with accessibility (WCAG).** Upload a banner or social image. Extract dominant colours (K-Means), compare them with the brand palette using CIEDE2000 colour difference, measure text contrast against WCAG 2.1 AA (4.5:1) for text regions, and use Gemini Vision for logo placement and layout. Findings reuse the same issue format, citations (guide page) and workflow, so the Review Studio shows image issues with highlighted regions.
-2. **Revision history, side-by-side diff and exception waivers.** Keep every version of a draft with who changed what. Show a word-level diff between versions. Managers grant or deny exception requests with a recorded reason, and a granted exception stops that issue from blocking approval for that draft. Add real sign-in with Creator, Manager and Compliance Reviewer roles.
-3. **Governance insights and sensitive-data masking.** Mask confidential codenames and customer names locally before any AI call (reversible mapping kept on the server), and show what was masked. Turn repeated mistakes and exception requests into recommendations ("Rule p3_r1 got 6 exception requests: clarify the wording"), over time, with a downloadable compliance summary.
+## AI Assistance & Reuse Disclosure
+Code and documentation were developed with pair-programming assistance from Anthropic Claude and Google Antigravity. Planning and architecture were reviewed against hackathon guidelines. No code from earlier repositories was reused. Runtime AI is powered by Google Gemini via the official `google-genai` SDK.
 
-## Team contribution [FILL IN: each person writes their own]
-- Shruthi Pallemoni: [backend, AI/RAG, evaluation, ...]
-- Pradeep Sutrave: [frontend, workflow, sample data, testing, ...]
-
-## AI-assistance and reuse disclosure
-Code and documents were drafted with help from Claude (Anthropic) and planning advice from ChatGPT, then reviewed, run and tested by the team. Runtime AI: Google Gemini. No code from earlier projects was reused. [CHECK: edit if untrue]
-Libraries: FastAPI, Pydantic, Uvicorn, motor, pypdf, python-docx, numpy, google-genai, certifi, reportlab (sample kit generation).
-
-## Known limitations
-Text-only checks (no images yet); text PDFs only; keyword-only search if embeddings are unavailable; claims phrased in unusual ways can be missed; roles are simplified (no sign-in yet); free hosting may sleep and clears in-memory drafts on restart if MongoDB is unreachable.
+## Known Limitations
+- Offline retrieval uses BM25 keyword matching + RRF; full semantic search requires active Gemini embedding quota.
+- Text within images is not masked before passing to Gemini Vision (creators can switch AI off for local palette-only checking).
+- Free-tier hosting on Render can sleep after inactivity and clears in-memory drafts on restart if MongoDB Atlas is unreachable.

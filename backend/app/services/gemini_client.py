@@ -22,7 +22,8 @@ QUOTA_KEYS = ("RESOURCE_EXHAUSTED", "429")
 T = TypeVar("T", bound=BaseModel)
 
 
-def _call(system: str, user: str, schema: Type[BaseModel]) -> str:
+def _call(system: str, user: str, schema: Type[BaseModel], image: Optional[tuple] = None) -> str:
+    """image is (bytes, mime_type) for a vision call; text-only calls leave it None."""
     from google import genai
     from google.genai import types
 
@@ -33,29 +34,11 @@ def _call(system: str, user: str, schema: Type[BaseModel]) -> str:
         cfg = types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_budget=0), **kwargs)
     except Exception:  # noqa: BLE001
         cfg = types.GenerateContentConfig(**kwargs)
-
-    # Try configured model, with automatic fallback if deprecated or 404
-    models_to_try = [settings.gemini_model]
-    for fb in ("gemini-3.8-flash", "gemini-flash-latest", "gemini-2.5-flash-lite"):
-        if fb not in models_to_try:
-            models_to_try.append(fb)
-
-    last_exc = None
-    for model_name in models_to_try:
-        try:
-            return client.models.generate_content(model=model_name, contents=user, config=cfg).text
-        except Exception as exc:
-            err_msg = str(exc)
-            if any(k in err_msg for k in ("404", "NOT_FOUND", "no longer available", "not found")):
-                log.warning("Gemini model %s unavailable (%s), trying fallback...", model_name, exc)
-                last_exc = exc
-                continue
-            raise exc
-    if last_exc:
-        raise last_exc
+    contents = user if image is None else [types.Part.from_bytes(data=image[0], mime_type=image[1]), user]
+    return client.models.generate_content(model=settings.gemini_model, contents=contents, config=cfg).text
 
 
-async def generate_json(system: str, user: str, schema: Type[T]) -> Optional[T]:
+async def generate_json(system: str, user: str, schema: Type[T], image: Optional[tuple] = None) -> Optional[T]:
     global LAST_ERROR
     global _blocked_until
     if not settings.gemini_api_key:
@@ -66,7 +49,8 @@ async def generate_json(system: str, user: str, schema: Type[T]) -> Optional[T]:
         return None  # LAST_ERROR still holds the quota message
     for attempt in range(2):  # one retry, then fail soft
         try:
-            text = await asyncio.wait_for(asyncio.to_thread(_call, system, user, schema), timeout=settings.gemini_timeout)
+            args = (system, user, schema) if image is None else (system, user, schema, image)
+            text = await asyncio.wait_for(asyncio.to_thread(_call, *args), timeout=settings.gemini_timeout)
             return schema.model_validate_json(text)
         except Exception as exc:  # noqa: BLE001
             LAST_ERROR = mask(f"{type(exc).__name__}: {exc}")[:300]

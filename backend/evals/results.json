@@ -104,8 +104,42 @@
     "tone_guard_valid_item_kept": true
   },
   "latency": {
-    "mean_ms": 0.9849035715368311,
-    "p95_ms": 1.4471000013145385,
-    "max_ms": 1.546299999972689
+    "mean_ms": 1.2609017846573676,
+    "p95_ms": 1.5665999380871654,
+    "max_ms": 1.8128999508917332
+  },
+  "masking": {
+    "sensitive_items_tested": 15,
+    "sensitive_recall": 1.0,
+    "per_kind_recall": {
+      "card": "2/2",
+      "confidential": "3/3",
+      "email": "2/2",
+      "key": "6/6",
+      "phone": "2/2"
+    },
+    "benign_numbers_tested": 13,
+    "benign_false_positive_rate": 0.0,
+    "roundtrip_cases": 2,
+    "roundtrip_accuracy": 1.0,
+    "leak_detection_failsafe": true
+  },
+  "image_science": {
+    "sharma_benchmark_pairs": 23,
+    "ciede2000_mae": 2.2004531968462622e-05,
+    "ciede2000_max_error": 4.173029102672032e-05,
+    "wcag_contrast_cases": 7,
+    "wcag_ratio_accuracy": 1.0,
+    "wcag_suggestions_evaluated": 3,
+    "wcag_suggestion_pass_rate": 1.0,
+    "palette_rules_tested": 5,
+    "palette_accuracy": 1.0,
+    "synthetic_on_brand_clean": true,
+    "synthetic_off_brand_flagged": true,
+    "input_validation_rejections": "2/2"
+  },
+  "diffing": {
+    "pairs_tested": 5,
+    "reconstruction_invariance": 1.0
   }
 }

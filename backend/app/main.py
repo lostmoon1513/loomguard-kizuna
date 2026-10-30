@@ -1,5 +1,6 @@
 """LoomGuard API entrypoint."""
 import json
+import os
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -13,9 +14,11 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .config import settings
 from .db import close_db, ping_db
-from .routers import brand, debug, drafts
-from .services import drafts_store, store
+from .ratelimit import RateLimit
+from .routers import auth, brand, debug, drafts
+from .services import accounts, drafts_store, store
 from .services.demo import demo_available, load_demo_kit
+from .services import gemini_client
 from .services.gemini_client import diagnose
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -28,6 +31,11 @@ MOCK_PATH = Path(__file__).resolve().parent.parent / "mocks" / "draft_response.j
 async def lifespan(_: FastAPI):
     log.info("LoomGuard starting. Gemini key set: %s, Mongo URI set: %s",
              bool(settings.gemini_api_key), bool(settings.mongo_uri))
+    seeded = accounts.seed_demo_users()
+    if seeded:
+        log.info("Seeded %d demo accounts", seeded)
+    if settings.legacy_header_auth:
+        log.warning("LEGACY_HEADER_AUTH is ON: X-Role / X-User headers are accepted. Turn it off before the final submission.")
     await store.load_kit()
     if store.KIT.version == 0 and settings.autoload_demo and demo_available():
         try:
@@ -44,11 +52,14 @@ app = FastAPI(title="LoomGuard API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=list(settings.cors_origins),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+app.add_middleware(RateLimit, enabled=os.getenv("RATE_LIMIT", "true").lower() == "true")
 
 
 def error_json(status: int, code: str, message: str) -> JSONResponse:
@@ -56,6 +67,7 @@ def error_json(status: int, code: str, message: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"error": {"code": code, "message": message}})
 
 
+app.include_router(auth.router)
 app.include_router(brand.router)
 app.include_router(drafts.router)
 app.include_router(debug.router)
@@ -85,6 +97,11 @@ async def unhandled_exc_handler(_: Request, exc: Exception):
     return error_json(500, "INTERNAL_ERROR", "Something went wrong on the server.")
 
 
+def _quota_paused() -> bool:
+    import time
+    return time.time() < gemini_client._blocked_until
+
+
 @app.get("/api/health")
 async def health():
     db = await ping_db()
@@ -93,6 +110,11 @@ async def health():
         "version": app.version,
         "gemini_configured": bool(settings.gemini_api_key),
         "database": db,
+        "persistence": "mongodb" if db.get("connected") else "memory",  # "memory" = drafts are lost on restart
+        "kit_version": store.KIT.version,
+        "ai": {"paused_for_quota": _quota_paused(), "last_error": (gemini_client.LAST_ERROR or None)},
+        "drafts_in_memory": len(drafts_store.DRAFTS),
+        "auth": {"demo_accounts": settings.seed_demo_users, "legacy_header_auth": settings.legacy_header_auth},
     }
 
 

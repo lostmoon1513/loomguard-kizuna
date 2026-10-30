@@ -1,9 +1,10 @@
 from typing import Literal, Optional
 
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
 from ..config import settings
+from ..deps import current_user, require_roles
 from ..services import store
 from ..services.demo import demo_available, load_demo_kit
 from ..services.embeddings import embed
@@ -23,10 +24,16 @@ class PreferredTerm(BaseModel):
     use: str = Field(min_length=1, max_length=80)
 
 
+class ConfidentialTerm(BaseModel):
+    term: str = Field(min_length=2, max_length=80)
+    kind: str = Field("codename", max_length=30)  # codename, customer, project ... free label shown to the creator
+
+
 class Terms(BaseModel):
     banned: list[BannedTerm] = []
     preferred: list[PreferredTerm] = []
     hex_codes: list[str] = []
+    confidential: list[ConfidentialTerm] = []  # masked locally before any AI call
 
 
 async def _read(upload: UploadFile) -> bytes:
@@ -40,7 +47,7 @@ def _parse_error(exc: ParseError) -> HTTPException:
     return HTTPException(400, f"{exc.code}: {exc.message}")
 
 
-@router.post("/upload")
+@router.post("/upload", dependencies=[Depends(require_roles("manager"))])
 async def upload_kit(guide: UploadFile = File(...), facts: UploadFile = File(...)):
     if not (guide.filename or "").lower().endswith(".pdf"):
         raise HTTPException(400, "FILE_UNSUPPORTED: the brand guide must be a PDF.")
@@ -59,7 +66,7 @@ async def upload_kit(guide: UploadFile = File(...), facts: UploadFile = File(...
     return _summary(kit)
 
 
-@router.post("/load-demo")
+@router.post("/load-demo", dependencies=[Depends(require_roles("manager"))])
 async def load_demo():
     """One click: loads the bundled demo guide, facts and terms."""
     if not demo_available():
@@ -71,19 +78,20 @@ async def load_demo():
     return _summary(kit)
 
 
-@router.put("/terms")
+@router.put("/terms", dependencies=[Depends(require_roles("manager"))])
 async def set_terms(terms: Terms):
     store.KIT.terms = terms.model_dump()
     await store.save_kit()
-    return {"banned": len(terms.banned), "preferred": len(terms.preferred), "hex_codes": len(terms.hex_codes)}
+    return {"banned": len(terms.banned), "preferred": len(terms.preferred), "hex_codes": len(terms.hex_codes),
+            "confidential": len(terms.confidential)}
 
 
-@router.get("")
+@router.get("", dependencies=[Depends(current_user)])
 async def get_brand():
     return _summary(store.KIT)
 
 
-@router.get("/search")
+@router.get("/search", dependencies=[Depends(current_user)])
 async def search(q: str = Query(min_length=2), source: Literal["guide", "facts"] = "guide", k: int = 3):
     """Debug endpoint to verify retrieval and citations."""
     kit = store.KIT

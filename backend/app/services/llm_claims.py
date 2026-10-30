@@ -17,9 +17,21 @@ class Phrases(BaseModel):
     phrases: list[str] = Field(default_factory=list, max_length=5)
 
 
-async def extract_claim_phrases(text: str) -> Optional[list[str]]:
+async def extract_claim_phrases(text: str, masker=None, terms: Optional[dict] = None) -> Optional[list[str]]:
     """None means Gemini was unavailable (caller reports ai_available=false)."""
-    res = await generate_json(SYSTEM, f"<draft>\n{text}\n</draft>", Phrases)
+    from . import gemini_client
+    from .masking import safe_masker
+
+    masker = masker or safe_masker(text, terms)
+    if masker is None:  # fail closed: never send unmasked text
+        gemini_client.LAST_ERROR = "Masking failed, so the AI check was skipped to protect confidential data."
+        return None
+    user = f"<draft>\n{masker.masked}\n</draft>"
+    if masker.leaked(SYSTEM, user):
+        gemini_client.LAST_ERROR = "A confidential value was still in the prompt, so the AI check was skipped."
+        return None
+    res = await generate_json(SYSTEM, user, Phrases)
     if res is None:
         return None
-    return [p for p in res.phrases if p and p in text]
+    phrases = [masker.unmask(p) for p in res.phrases]
+    return [p for p in phrases if p and p in text]
