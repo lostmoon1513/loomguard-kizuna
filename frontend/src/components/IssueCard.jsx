@@ -8,6 +8,7 @@ import {
   X,
 } from 'lucide-react';
 import StatusBadge from './StatusBadge.jsx';
+import WaiverPanel from './WaiverPanel.jsx';
 
 const severityBorderClass = {
   high: 'border-l-rose-500',
@@ -23,6 +24,9 @@ const severityBadgeClass = {
 
 export default function IssueCard({
   issue,
+  draftId,
+  draftStatus,
+  onWaiverDecided,
   disabled = false,
   onAccept,
   onEdit,
@@ -145,6 +149,15 @@ export default function IssueCard({
             <p className="mt-1 text-slate-700 italic">"{issue.exception_note}"</p>
           </div>
         )}
+
+        {/* Waiver Decision & Record Panel (P3 / contract_v2) */}
+        <WaiverPanel
+          draftId={draftId}
+          issue={issue}
+          draftStatus={draftStatus}
+          onWaiverDecided={onWaiverDecided}
+          disabled={disabled}
+        />
 
         {canAct && (
           <div className="mt-4 space-y-3">

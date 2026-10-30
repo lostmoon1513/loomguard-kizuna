@@ -26,6 +26,12 @@ import ErrorMessage from '../components/ErrorMessage.jsx';
 import LoadingState from '../components/LoadingState.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import HighlightedDraft from '../components/HighlightedDraft.jsx';
+import ImageViewer from '../components/ImageViewer.jsx';
+import WaiverPanel from '../components/WaiverPanel.jsx';
+import CommentThread from '../components/CommentThread.jsx';
+import AuditList from '../components/AuditList.jsx';
+import MaskingPanel from '../components/MaskingPanel.jsx';
+import { grantOrDenyWaiver, getDraftImageBlobUrl } from '../api/drafts.js';
 
 export default function ManagerReview() {
   const location = useLocation();
@@ -37,9 +43,36 @@ export default function ManagerReview() {
     location.state?.draftId || '',
   );
   const [draft, setDraft] = useState(null);
-  const [comment, setComment] = useState('');
   const [decisionComment, setDecisionComment] = useState('');
   const [loading, setLoading] = useState(true);
+  const [managerImageUrl, setManagerImageUrl] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    let url = null;
+
+    async function loadImg() {
+      if (!draft?.id || (draft.kind !== 'image' && !draft.image)) {
+        setManagerImageUrl((prev) => (prev !== null ? null : prev));
+        return;
+      }
+
+      try {
+        const b = await getDraftImageBlobUrl(draft.id, null, false);
+        if (!cancelled && b) {
+          url = b;
+          setManagerImageUrl(b);
+        }
+      } catch (err) { void err; }
+    }
+
+    loadImg();
+
+    return () => {
+      cancelled = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [draft?.id, draft?.revision, draft?.kind, draft?.image]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -52,7 +85,13 @@ export default function ManagerReview() {
 
       setDraftId((prev) => prev || (data.length ? data[0].id : ''));
     } catch (error) {
-      setError(getErrorMessage(error));
+      if (error?.response?.data?.error?.code === 'PENDING_EXCEPTIONS') {
+        setError('Cannot approve: There are undecided exception requests that must be granted or denied first.');
+      } else if (error?.response?.data?.error?.code === 'OPEN_MANDATORY_ISSUES') {
+        setError('Cannot approve: Mandatory issues remain open that have not been fixed or granted a waiver.');
+      } else {
+        setError(getErrorMessage(error));
+      }
     } finally {
       setLoading(false);
     }
@@ -110,26 +149,41 @@ export default function ManagerReview() {
     setLoading(false);
   };
 
-  const postComment = async () => {
-    if (!comment.trim() || !draft) {
-      return;
-    }
-
+  const handleWaiverDecided = async (issueId, decision, reason) => {
+    if (!draft?.id) return;
     setBusy(true);
     setError('');
+    setNotice('');
 
     try {
-      const updated = await addComment(draft.id, comment.trim());
-
+      const updated = await grantOrDenyWaiver(draft.id, issueId, decision, reason);
       setDraft(updated);
-      setComment('');
-      setNotice('Comment added to the draft.');
-    } catch (error) {
-      setError(getErrorMessage(error));
+      setNotice(`Waiver ${decision === 'grant' ? 'granted' : 'denied'} for issue.`);
+      await loadRows();
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setBusy(false);
     }
   };
+
+  const handleAddCommentWithReply = async (text, parentId) => {
+    if (!draft?.id) return;
+    setBusy(true);
+    setError('');
+
+    try {
+      const updated = await addComment(draft.id, text, undefined, parentId);
+      setDraft(updated);
+      setNotice(parentId ? 'Reply posted.' : 'Comment added.');
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+
 
   const decide = async (decision) => {
     if (!draft) {
@@ -181,16 +235,13 @@ export default function ManagerReview() {
         </div>
       )}
 
-      {role !== 'manager' && (
-        <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+      {role === 'reviewer' && (
+        <div className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
           <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0" />
-
           <div>
-            <strong>Manager role required for decisions</strong>
-
+            <strong>Compliance Reviewer View</strong>
             <p className="mt-1">
-              Switch the role selector in the header to Manager. The
-              backend enforces this through the X-Role request header.
+              You can review findings, add comments/replies, and grant waivers for CLAIM issues. Final approval and change requests are restricted to Managers.
             </p>
           </div>
         </div>
@@ -307,9 +358,26 @@ export default function ManagerReview() {
                 )}
 
                 <div className="mt-5 rounded-xl border border-slate-200 p-4">
-                  <HighlightedDraft
-                    text={draft.text || ''}
-                    issues={draft.issues || []}
+                  {draft.kind === 'image' || Boolean(draft.image) ? (
+                    <ImageViewer
+                      imageUrl={managerImageUrl}
+                      issues={draft.issues || []}
+                      imageMeta={draft.image}
+                    />
+                  ) : (
+                    <HighlightedDraft
+                      text={draft.text || ''}
+                      issues={draft.issues || []}
+                    />
+                  )}
+                </div>
+
+                {/* Masking Disclosure Panel (P5 / contract_v2 §8) */}
+                <div className="mt-4">
+                  <MaskingPanel
+                    maskSummary={draft.mask_summary}
+                    draftKind={draft.kind}
+                    checks={draft.checks}
                   />
                 </div>
 
@@ -409,6 +477,15 @@ export default function ManagerReview() {
                               "{issue.exception_note || 'No explanatory note provided.'}"
                             </p>
                           </div>
+
+                          {/* Waiver Decision Action Form (P3 / contract_v2) */}
+                          <WaiverPanel
+                            draftId={draft.id}
+                            issue={issue}
+                            draftStatus={draft.status}
+                            onWaiverDecided={handleWaiverDecided}
+                            disabled={busy}
+                          />
                         </div>
                       ))}
                     </div>
@@ -441,75 +518,18 @@ export default function ManagerReview() {
                 </div>
               </div>
 
+              {/* Threaded Discussion (P3 / contract_v2) */}
               <div className="panel p-5 sm:p-6">
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="h-5 w-5 text-indigo-600" />
-                  <h3 className="font-bold">Review comments</h3>
-                </div>
+                <CommentThread
+                  comments={draft.comments || []}
+                  onAddComment={handleAddCommentWithReply}
+                  disabled={busy}
+                />
+              </div>
 
-                <div className="mt-4 space-y-3">
-                  {(draft.comments || []).map((item) => (
-                    <div
-                      key={item.id}
-                      className={`rounded-xl p-3 border ${
-                        item.role === 'manager'
-                          ? 'border-amber-200 bg-amber-50/50'
-                          : 'border-indigo-100 bg-indigo-50/40'
-                      }`}
-                    >
-                      <div className="flex flex-wrap justify-between gap-2 text-xs">
-                        <div className="flex items-center gap-2">
-                          <strong className="text-slate-800">
-                            {item.author || 'Reviewer'}
-                          </strong>
-                          <span
-                            className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                              item.role === 'manager'
-                                ? 'bg-amber-200 text-amber-900'
-                                : 'bg-indigo-100 text-indigo-800'
-                            }`}
-                          >
-                            {item.role || 'user'}
-                          </span>
-                        </div>
-
-                        <span className="text-slate-400 text-[11px]">
-                          {item.created_at
-                            ? new Date(item.created_at).toLocaleString()
-                            : ''}
-                        </span>
-                      </div>
-
-                      <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">
-                        {item.text}
-                      </p>
-                    </div>
-                  ))}
-
-                  {!(draft.comments || []).length && (
-                    <p className="text-sm text-slate-500">
-                      No comments yet.
-                    </p>
-                  )}
-                </div>
-
-                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
-                  <input
-                    className="field"
-                    value={comment}
-                    onChange={(event) => setComment(event.target.value)}
-                    placeholder="Add a review comment…"
-                    maxLength={2000}
-                  />
-
-                  <button
-                    className="btn-secondary shrink-0"
-                    disabled={busy || !comment.trim()}
-                    onClick={postComment}
-                  >
-                    Add comment
-                  </button>
-                </div>
+              {/* Draft Audit Trail (P3 / contract_v2) */}
+              <div className="panel p-5 sm:p-6">
+                <AuditList auditEvents={draft.audit || []} />
               </div>
 
               {draft.status === 'IN_REVIEW' ? (
@@ -556,7 +576,7 @@ export default function ManagerReview() {
                     <button
                       className="btn-secondary"
                       onClick={() =>
-                        navigate('/studio', {
+                        navigate(`/drafts/${draft.id}`, {
                           state: { draftId: draft.id },
                         })
                       }
@@ -575,7 +595,7 @@ export default function ManagerReview() {
                   <button
                     className="btn-secondary mt-3"
                     onClick={() =>
-                      navigate('/studio', {
+                      navigate(`/drafts/${draft.id}`, {
                         state: { draftId: draft.id },
                       })
                     }

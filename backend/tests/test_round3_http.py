@@ -98,8 +98,8 @@ def test_image_upload_flow_over_http():
 
 
 def test_insights_over_time_and_exports():
-    drafts_store.DRAFTS.clear()
     with TestClient(app) as c:
+        drafts_store.DRAFTS.clear()
         manager, creator = login(c, "manager"), login(c, "creator")
         assert c.get("/api/insights/trends", headers=creator).status_code == 403
         assert c.post("/api/demo/history", headers=creator).status_code == 403

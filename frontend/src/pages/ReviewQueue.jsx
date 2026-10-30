@@ -6,12 +6,14 @@ import {
   FileCheck2,
   RefreshCw,
   Search,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 import { getDrafts } from '../api/drafts.js';
 import { getErrorMessage } from '../api/client.js';
 import ErrorMessage from '../components/ErrorMessage.jsx';
 import LoadingState from '../components/LoadingState.jsx';
+import SkeletonCard from '../components/SkeletonCard.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 
 export default function ReviewQueue() {
@@ -106,7 +108,7 @@ export default function ReviewQueue() {
       </section>
 
       {loading ? (
-        <LoadingState label="Loading review queue…" />
+        <SkeletonCard type="row" count={5} />
       ) : (
         <section className="space-y-2">
           {/* Column headers — desktop only */}
@@ -122,7 +124,7 @@ export default function ReviewQueue() {
             <button
               key={draft.id}
               onClick={() =>
-                navigate('/studio', {
+                navigate(`/drafts/${draft.id}`, {
                   state: { draftId: draft.id },
                 })
               }
@@ -135,6 +137,12 @@ export default function ReviewQueue() {
                   <div className="truncate font-semibold text-slate-800">
                     {draft.title}
                   </div>
+                  {(draft.kind === 'image' || draft.image) && (
+                    <span className="flex items-center gap-1 rounded bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-700">
+                      <ImageIcon className="h-3 w-3" />
+                      Image
+                    </span>
+                  )}
                 </div>
 
                 <div className="mt-1 ml-4 text-xs text-slate-400">

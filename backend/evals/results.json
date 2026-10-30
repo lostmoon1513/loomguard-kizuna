@@ -104,9 +104,9 @@
     "tone_guard_valid_item_kept": true
   },
   "latency": {
-    "mean_ms": 1.2609017846573676,
-    "p95_ms": 1.5665999380871654,
-    "max_ms": 1.8128999508917332
+    "mean_ms": 1.4229964283783505,
+    "p95_ms": 1.762899999448564,
+    "max_ms": 1.842699999542674
   },
   "masking": {
     "sensitive_items_tested": 15,

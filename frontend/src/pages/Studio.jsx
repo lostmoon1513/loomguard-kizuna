@@ -1,6 +1,6 @@
 
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   AlertTriangle,
   ArrowRight,
@@ -11,14 +11,23 @@ import {
   LoaderCircle,
   RefreshCw,
   Send,
-  MessageSquare,
   Pencil,
   Sparkles,
   X,
+  ArrowLeftRight,
+  ChevronDown,
+  ChevronUp,
+  History,
+  Upload,
+  Image as ImageIcon,
+  Palette,
+  FileText,
 } from 'lucide-react';
 
 import {
   createDraft,
+  createImageDraft,
+  getDraftImageBlobUrl,
   getDemoDrafts,
   getDraft,
   getMockDraft,
@@ -28,7 +37,23 @@ import {
   getHealth,
   addComment,
   updateDraft,
+  getVersions,
+  getVersionText,
+  getDiff,
+  uploadRevision,
 } from '../api/drafts.js';
+import ImageUploadZone from '../components/ImageUploadZone.jsx';
+import ImageViewer from '../components/ImageViewer.jsx';
+import ImageIssueCard from '../components/ImageIssueCard.jsx';
+import ImageDiffViewer from '../components/ImageDiffViewer.jsx';
+import VersionTimeline from '../components/VersionTimeline.jsx';
+import DiffViewer from '../components/DiffViewer.jsx';
+import CommentThread from '../components/CommentThread.jsx';
+import AuditList from '../components/AuditList.jsx';
+import MaskingPanel from '../components/MaskingPanel.jsx';
+import StartHereCard from '../components/StartHereCard.jsx';
+import SkeletonCard from '../components/SkeletonCard.jsx';
+import { grantOrDenyWaiver } from '../api/drafts.js';
 import { getBrand } from '../api/brand.js';
 import { getErrorMessage } from '../api/client.js';
 import ErrorMessage from '../components/ErrorMessage.jsx';
@@ -58,8 +83,22 @@ export default function Studio() {
   const [submitNote, setSubmitNote] = useState('');
   const [isEditingText, setIsEditingText] = useState(false);
   const [draftEditText, setDraftEditText] = useState('');
+  const [versionsList, setVersionsList] = useState([]);
+  const [showTimeline, setShowTimeline] = useState(false);
+  const [diffModalData, setDiffModalData] = useState(null);
+  const [diffLoading, setDiffLoading] = useState(false);
+  const [isRevisionModalOpen, setIsRevisionModalOpen] = useState(false);
+  const [revisionText, setRevisionText] = useState('');
+  const [revisionFile, setRevisionFile] = useState(null);
+  const [revisionNote, setRevisionNote] = useState('');
+  const [draftType, setDraftType] = useState('text');
+  const [draftImageUrl, setDraftImageUrl] = useState(null);
+  const [activeIssueId, setActiveIssueId] = useState(null);
+  const [imageDiffModalData, setImageDiffModalData] = useState(null);
 
+  const { id: draftIdFromParam } = useParams();
   const draftIdFromNav = location.state?.draftId;
+  const effectiveDraftId = draftIdFromNav || draftIdFromParam;
 
   // Fetch brand kit, backend health, and demo samples on mount.
   useEffect(() => {
@@ -76,15 +115,70 @@ export default function Studio() {
     return () => { cancelled = true; };
   }, []);
 
-  // Load draft when navigated here from ReviewQueue (BUG-5: abort on unmount).
+  const isImageDraft = draft?.kind === 'image' || Boolean(draft?.image);
+
+  // Fetch authenticated image blob for image drafts (P4 / contract_v2 §8)
   useEffect(() => {
-    if (!draftIdFromNav) return;
+    let cancelled = false;
+    let url = null;
+
+    async function loadImg() {
+      if (!draft?.id || (draft.kind !== 'image' && !draft.image)) {
+        setDraftImageUrl((prev) => (prev !== null ? null : prev));
+        return;
+      }
+
+      try {
+        const blobUrl = await getDraftImageBlobUrl(draft.id, null, false);
+        if (!cancelled && blobUrl) {
+          url = blobUrl;
+          setDraftImageUrl(blobUrl);
+        }
+      } catch (err) {
+        void err;
+      }
+    }
+
+    loadImg();
+
+    return () => {
+      cancelled = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [draft?.id, draft?.revision, draft?.kind, draft?.image]);
+
+  const handleCheckImage = async ({ file: imgFile, title: imgTitle, useAi: imgUseAi }) => {
+    setBusy(true);
+    setError('');
+    setNotice('');
+
+    try {
+      const created = await createImageDraft({
+        file: imgFile,
+        title: imgTitle,
+        useAi: imgUseAi,
+      });
+
+      setDraft(created);
+      setText(created.text || '');
+      setTitle(created.title || imgFile.name);
+      setNotice('Image draft checked by the backend. Review brand palette and visual findings below.');
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+    // Load draft when navigated here from ReviewQueue or via /drafts/:id deep link (H10).
+  useEffect(() => {
+    if (!effectiveDraftId) return;
     let cancelled = false;
     async function loadDraftFromNavigation() {
       setLoadingDraft(true);
       setError('');
       try {
-        const d = await getDraft(draftIdFromNav);
+        const d = await getDraft(effectiveDraftId);
         if (!cancelled) {
           setDraft(d);
           setText(d.text || '');
@@ -99,7 +193,147 @@ export default function Studio() {
     }
     loadDraftFromNavigation();
     return () => { cancelled = true; };
-  }, [draftIdFromNav]);
+  }, [effectiveDraftId]);
+
+
+  // Sync and fetch draft version history (P2 / contract_v2)
+  useEffect(() => {
+    if (!draft?.id) return;
+
+    let cancelled = false;
+    async function fetchVersions() {
+      try {
+        const v = await getVersions(draft.id);
+        if (!cancelled && Array.isArray(v) && v.length > 0) {
+          setVersionsList(v);
+          return;
+        }
+      } catch (err) { void err; }
+
+      if (!cancelled) {
+        if (Array.isArray(draft.versions) && draft.versions.length > 0) {
+          setVersionsList(draft.versions);
+        } else {
+          setVersionsList([
+            {
+              n: 1,
+              author: draft.author || 'creator',
+              role: 'creator',
+              at: draft.created_at || new Date().toISOString(),
+              note: 'Initial draft',
+              counts: {
+                total: draft.issues?.length || 0,
+                open_mandatory: (draft.issues || []).filter(
+                  (i) => i.status === 'open' && i.priority === 'mandatory'
+                ).length,
+              },
+              chars: draft.text?.length || 0,
+            },
+          ]);
+        }
+      }
+    }
+
+    fetchVersions();
+    return () => { cancelled = true; };
+  }, [draft]);
+
+  const openDiff = async (fromVer, toVer) => {
+    setDiffLoading(true);
+    setDiffModalData({ from: fromVer, to: toVer, ops: [], stats: null });
+    try {
+      let oldText = '';
+      let newText = draft.text || '';
+      try {
+        const vOld = await getVersionText(draft.id, fromVer);
+        if (vOld?.text) oldText = vOld.text;
+        const vNew = await getVersionText(draft.id, toVer);
+        if (vNew?.text) newText = vNew.text;
+      } catch (err) { void err; }
+
+      const diffResult = await getDiff(draft.id, fromVer, toVer, oldText, newText);
+      setDiffModalData(diffResult);
+    } catch (err) {
+      setError(getErrorMessage(err));
+      setDiffModalData(null);
+    } finally {
+      setDiffLoading(false);
+    }
+  };
+
+  const handleWaiverDecided = async (issueId, decision, reason) => {
+    if (!draft?.id) return;
+    setBusy(true);
+    setError('');
+    setNotice('');
+
+    try {
+      const updated = await grantOrDenyWaiver(draft.id, issueId, decision, reason);
+      setDraft(updated);
+      setNotice(`Waiver ${decision === 'grant' ? 'granted' : 'denied'} for issue.`);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleAddCommentWithReply = async (commentText, parentId) => {
+    if (!draft?.id) return;
+    setBusy(true);
+    setError('');
+
+    try {
+      const updated = await addComment(draft.id, commentText, undefined, parentId);
+      setDraft(updated);
+      setNotice(parentId ? 'Reply posted.' : 'Comment added.');
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleUploadRevision = async (e) => {
+    e?.preventDefault();
+    if (!draft?.id) return;
+    if (!revisionFile && revisionText.trim().length < 3) {
+      setError('Please provide revised text or choose a supported file.');
+      return;
+    }
+
+    setBusy(true);
+    setError('');
+    setNotice('');
+
+    try {
+      const updated = await uploadRevision(draft.id, {
+        text: revisionFile ? undefined : revisionText.trim(),
+        file: revisionFile,
+        note: revisionNote.trim() || undefined,
+      });
+
+      setDraft(updated);
+      setText(updated.text);
+      setDraftEditText(updated.text);
+      setIsRevisionModalOpen(false);
+      setRevisionFile(null);
+      setRevisionText('');
+      setRevisionNote('');
+      setNotice(`Revision uploaded successfully as Version ${updated.revision || 'new'}. Findings updated.`);
+
+      if (Array.isArray(updated.versions) && updated.versions.length) {
+        setVersionsList(updated.versions);
+      } else {
+        const v = await getVersions(draft.id);
+        if (v) setVersionsList(v);
+      }
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const managerFeedback = useMemo(() => {
     if (!draft) return null;
@@ -164,7 +398,14 @@ export default function Studio() {
       issue.priority === 'mandatory',
   ).length;
 
-  const loadSample = async () => {
+  const handleLoadSampleBanner = () => {
+    setDraftType('image');
+    // Pre-populate sample graphic banner name
+    setTitle('Aurora Product Launch Banner (1200x630)');
+    setNotice('Switched to Graphic Banner mode. Select or drop a banner image to inspect color palette, WCAG contrast, and logo placement.');
+  };
+
+    const loadSample = async () => {
     setBusy(true);
     setError('');
 
@@ -259,13 +500,24 @@ export default function Studio() {
         draft.id,
         issue.id,
         payload,
+        draft.revision,
       );
 
       setDraft(updated);
       setText(updated.text);
       setNotice(label);
     } catch (error) {
-      setError(getErrorMessage(error));
+      if (error?.response?.status === 409) {
+        const msg = getErrorMessage(error);
+        setError(`${msg} Reloading latest version...`);
+        try {
+          const fresh = await getDraft(draft.id);
+          setDraft(fresh);
+          setText(fresh.text);
+        } catch (err) { void err; }
+      } else {
+        setError(getErrorMessage(error));
+      }
     } finally {
       setBusy(false);
     }
@@ -391,6 +643,19 @@ export default function Studio() {
         </div>
       )}
 
+      {/* Quickstart Onboarding Card (P7 / ROUND3_HANDOFF) */}
+      <StartHereCard
+        onLoadSampleText={loadSample}
+        onLoadSampleBanner={handleLoadSampleBanner}
+        onKitLoaded={async () => {
+          try {
+            const b = await getBrand();
+            setBrand(b);
+            setNotice('Aurora Demo Brand Kit loaded successfully.');
+          } catch (err) { void err; }
+        }}
+      />
+
       <section className="panel p-5 sm:p-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -413,6 +678,46 @@ export default function Studio() {
           </div>
         </div>
 
+        {/* Draft Type Switcher (Document/Text vs Banner Image) */}
+        <div className="mt-5 flex items-center border-b border-slate-200">
+          <button
+            type="button"
+            onClick={() => setDraftType('text')}
+            className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold transition-colors ${
+              draftType === 'text'
+                ? 'border-indigo-600 text-indigo-700'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <FileText className="h-4 w-4" />
+            <span>Document / Text Draft</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setDraftType('image')}
+            className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-xs font-bold transition-colors ${
+              draftType === 'image'
+                ? 'border-indigo-600 text-indigo-700'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <ImageIcon className="h-4 w-4" />
+            <span>Graphic / Banner Image</span>
+            <span className="rounded-full bg-indigo-100 px-1.5 py-0.2 text-[10px] font-semibold text-indigo-700">
+              contract §8
+            </span>
+          </button>
+        </div>
+
+        {draftType === 'image' ? (
+          <div className="mt-5">
+            <ImageUploadZone
+              onCheckImage={handleCheckImage}
+              disabled={busy}
+            />
+          </div>
+        ) : (
         <form onSubmit={checkDraft} className="mt-6 space-y-4">
           <div className="grid gap-4 md:grid-cols-[1fr_1fr]">
             <label className="block text-sm font-semibold">
@@ -566,10 +871,11 @@ export default function Studio() {
             </div>
           </div>
         </form>
+        )}
       </section>
 
       {loadingDraft && (
-        <LoadingState label="Loading draft details…" />
+        <SkeletonCard type="draft" />
       )}
 
       {draft && !loadingDraft && (
@@ -651,71 +957,212 @@ export default function Studio() {
                   </h2>
 
                   <p className="mt-1 text-xs text-slate-500">
-                    {draft.text?.length ?? 0} characters · Kit version{' '}
-                    {draft.kit_version ?? 'unknown'}
+                    {isImageDraft && draft.image
+                      ? `${draft.image.width} × ${draft.image.height} px · ${draft.image.format || 'PNG'} · ${(draft.image.bytes / 1024).toFixed(0)} KB`
+                      : `${draft.text?.length ?? 0} characters`
+                    } · Kit version {draft.kit_version ?? 'unknown'}
                   </p>
                 </div>
 
                 <StatusBadge status={draft.status} />
               </div>
 
-              <div className="mt-4 flex items-center justify-between gap-2">
-                <span className="text-xs font-semibold text-slate-500">
-                  {isEditingText ? 'Editing full draft text' : 'Marked findings in text'}
-                </span>
-                <button
-                  type="button"
-                  className="btn-secondary text-xs py-1 px-2.5"
-                  disabled={busy || useMock || !['DRAFT', 'CHANGES_REQUESTED'].includes(draft.status)}
-                  onClick={() => {
-                    setIsEditingText((prev) => !prev);
-                    setDraftEditText(draft.text || '');
-                  }}
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                  {isEditingText ? 'View highlights' : 'Edit text directly'}
-                </button>
+              {/* Version History & Actions Toolbar (P2 / contract_v2) */}
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-md bg-indigo-100 border border-indigo-200 px-2 py-0.5 text-xs font-bold text-indigo-700">
+                      Version {draft.revision || (versionsList.length ? versionsList[versionsList.length - 1]?.n : 1)}
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      {versionsList.length} revision{versionsList.length === 1 ? '' : 's'} recorded
+                    </span>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {versionsList.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => isImageDraft ? setImageDiffModalData({ from: versionsList[0].n, to: versionsList[versionsList.length - 1].n }) : openDiff(versionsList[0].n, versionsList[versionsList.length - 1].n)}
+                        className="btn-secondary text-xs py-1 px-2.5"
+                        title="Compare first and latest version"
+                      >
+                        <ArrowLeftRight className="h-3.5 w-3.5 text-indigo-600" />
+                        <span>Compare diff</span>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => setShowTimeline((prev) => !prev)}
+                      className="btn-secondary text-xs py-1 px-2.5"
+                    >
+                      <History className="h-3.5 w-3.5 text-slate-600" />
+                      <span>{showTimeline ? 'Hide history' : 'Version history'}</span>
+                      {showTimeline ? (
+                        <ChevronUp className="h-3.5 w-3.5 text-slate-400" />
+                      ) : (
+                        <ChevronDown className="h-3.5 w-3.5 text-slate-400" />
+                      )}
+                    </button>
+
+                    {['DRAFT', 'CHANGES_REQUESTED'].includes(draft.status) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRevisionText(draft.text || '');
+                          setIsRevisionModalOpen(true);
+                        }}
+                        disabled={busy || useMock}
+                        className="btn-secondary text-xs py-1 px-2.5 text-indigo-700 border-indigo-200 bg-indigo-50/50 hover:bg-indigo-100/50"
+                        title="Upload a new revision with an optional note"
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        <span>New revision</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Collapsible Version Timeline */}
+                {showTimeline && (
+                  <div className="mt-4 pt-4 border-t border-slate-200">
+                    <VersionTimeline
+                      versions={versionsList}
+                      currentVersion={draft.revision || 1}
+                      onCompare={(from, to) => isImageDraft ? setImageDiffModalData({ from, to }) : openDiff(from, to)}
+                      onUploadRevision={
+                        ['DRAFT', 'CHANGES_REQUESTED'].includes(draft.status)
+                          ? () => {
+                              setRevisionText(draft.text || '');
+                              setIsRevisionModalOpen(true);
+                            }
+                          : null
+                      }
+                      disabled={busy || useMock}
+                    />
+                  </div>
+                )}
               </div>
 
-              {isEditingText ? (
-                <div className="mt-3 space-y-3">
-                  <textarea
-                    className="field min-h-56 leading-relaxed"
-                    value={draftEditText}
-                    onChange={(e) => setDraftEditText(e.target.value)}
-                    placeholder="Edit draft text..."
+              {isImageDraft ? (
+                <div className="mt-4 space-y-4">
+                  <ImageViewer
+                    imageUrl={draftImageUrl}
+                    issues={filteredIssues}
+                    activeIssueId={activeIssueId}
+                    onSelectIssue={(id) => setActiveIssueId(id)}
+                    imageMeta={draft.image}
                   />
-                  <div className="flex flex-wrap gap-2">
+
+                  {draft.palette && Array.isArray(draft.palette) && draft.palette.length > 0 && (
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-2xs">
+                      <div className="flex items-center justify-between text-xs font-semibold text-slate-700 mb-2.5">
+                        <span className="flex items-center gap-1.5 font-bold text-slate-900">
+                          <Palette className="h-4 w-4 text-indigo-600" />
+                          Detected Brand Palette ({draft.palette.length} Dominant Colors)
+                        </span>
+                        <span className="text-[11px] font-normal text-slate-400">
+                          K-Means Clustering · WCAG / Delta-E
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2.5">
+                        {draft.palette.map((p, pIdx) => (
+                          <div
+                            key={pIdx}
+                            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs shadow-2xs"
+                          >
+                            <span
+                              className="h-4 w-4 rounded-full border border-slate-300 shadow-2xs shrink-0"
+                              style={{ backgroundColor: p.hex }}
+                            />
+                            <span className="font-mono font-bold text-slate-800">{p.hex}</span>
+                            <span className="text-[11px] text-slate-500">{(p.share * 100).toFixed(0)}%</span>
+                            <span
+                              className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold ${
+                                p.on_brand
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                  : 'bg-amber-100 text-amber-800 border border-amber-200'
+                              }`}
+                            >
+                              {p.on_brand ? 'On-brand' : `ΔE ${p.delta_e ?? p.delta_e00 ?? 'off'}`}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="mt-4 flex items-center justify-between gap-2">
+                    <span className="text-xs font-semibold text-slate-500">
+                      {isEditingText ? 'Editing full draft text' : 'Marked findings in text'}
+                    </span>
                     <button
                       type="button"
-                      className="btn-primary"
-                      disabled={busy || draftEditText.trim().length < 3}
-                      onClick={saveDraftTextAndRecheck}
-                    >
-                      <CheckCircle2 className="h-4 w-4" />
-                      Save edits and recheck
-                    </button>
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      disabled={busy}
+                      className="btn-secondary text-xs py-1 px-2.5"
+                      disabled={busy || useMock || !['DRAFT', 'CHANGES_REQUESTED'].includes(draft.status)}
                       onClick={() => {
-                        setIsEditingText(false);
+                        setIsEditingText((prev) => !prev);
                         setDraftEditText(draft.text || '');
                       }}
                     >
-                      Cancel
+                      <Pencil className="h-3.5 w-3.5" />
+                      {isEditingText ? 'View highlights' : 'Edit text directly'}
                     </button>
                   </div>
-                </div>
-              ) : (
-                <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
-                  <HighlightedDraft
-                    text={draft.text || ''}
-                    issues={issues}
-                  />
-                </div>
+
+                  {isEditingText ? (
+                    <div className="mt-3 space-y-3">
+                      <textarea
+                        className="field min-h-56 leading-relaxed"
+                        value={draftEditText}
+                        onChange={(e) => setDraftEditText(e.target.value)}
+                        placeholder="Edit draft text..."
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          className="btn-primary"
+                          disabled={busy || draftEditText.trim().length < 3}
+                          onClick={saveDraftTextAndRecheck}
+                        >
+                          <CheckCircle2 className="h-4 w-4" />
+                          Save edits and recheck
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          disabled={busy}
+                          onClick={() => {
+                            setIsEditingText(false);
+                            setDraftEditText(draft.text || '');
+                          }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
+                      <HighlightedDraft
+                        text={draft.text || ''}
+                        issues={issues}
+                      />
+                    </div>
+                  )}
+                </>
               )}
+
+              {/* Masking Disclosure Panel (P5 / contract_v2 §8) */}
+              <div className="mt-4">
+                <MaskingPanel
+                  maskSummary={draft.mask_summary}
+                  draftKind={draft.kind}
+                  checks={draft.checks}
+                />
+              </div>
 
               <div className="mt-4 flex flex-wrap gap-2">
                 <span className="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">
@@ -797,32 +1244,19 @@ export default function Studio() {
                 )}
               </div>
 
-              {(draft.comments || []).length > 0 && (
-                <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                  <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-slate-500">
-                    <MessageSquare className="h-4 w-4 text-indigo-600" />
-                    Review comments & history ({(draft.comments || []).length})
-                  </div>
-                  <div className="mt-3 space-y-2 max-h-52 overflow-y-auto">
-                    {(draft.comments || []).map((c) => (
-                      <div key={c.id} className="rounded-lg border border-slate-200 bg-white p-3 text-xs">
-                        <div className="flex justify-between items-center text-slate-500 mb-1">
-                          <strong className="text-slate-800">
-                            {c.author || 'Reviewer'}
-                            <span className={`ml-2 rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${
-                              c.role === 'manager' ? 'bg-amber-100 text-amber-800' : 'bg-indigo-100 text-indigo-800'
-                            }`}>
-                              {c.role || 'user'}
-                            </span>
-                          </strong>
-                          <span>{c.created_at ? new Date(c.created_at).toLocaleTimeString() : ''}</span>
-                        </div>
-                        <p className="whitespace-pre-wrap text-slate-700">{c.text}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+              {/* Threaded Discussion Section (P3 / contract_v2) */}
+              <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50/70 p-5">
+                <CommentThread
+                  comments={draft.comments || []}
+                  onAddComment={handleAddCommentWithReply}
+                  disabled={busy}
+                />
+              </div>
+
+              {/* Draft Audit Trail Section (P3 / contract_v2) */}
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs">
+                <AuditList auditEvents={draft.audit || []} />
+              </div>
             </section>
 
             <section className="min-w-0">
@@ -846,54 +1280,90 @@ export default function Studio() {
                   <option value="exception_requested">
                     Exception requested
                   </option>
+                  <option value="waived">Waived</option>
                   <option value="mandatory">Mandatory only</option>
                 </select>
               </div>
 
               <div className="space-y-3">
-                {filteredIssues.map((issue) => (
-                  <IssueCard
-                    key={`${issue.id}_${issue.quote}_${issue.start}`}
-                    issue={issue}
-                    disabled={
-                      busy ||
-                      useMock ||
-                      !['DRAFT', 'CHANGES_REQUESTED'].includes(
-                        draft.status,
-                      )
-                    }
-                    onAccept={(item, chosenFix) =>
-                      act(
-                        item,
-                        {
-                          action: 'accept',
-                          chosen_fix: chosenFix,
-                        },
-                        'Fix accepted and checks rerun.',
-                      )
-                    }
-                    onEdit={(item, newText) =>
-                      act(
-                        item,
-                        {
-                          action: 'edit',
-                          new_text: newText,
-                        },
-                        'Phrase updated and checks rerun.',
-                      )
-                    }
-                    onException={(item, note) =>
-                      act(
-                        item,
-                        {
-                          action: 'request_exception',
-                          note,
-                        },
-                        'Exception request recorded.',
-                      )
-                    }
-                  />
-                ))}
+                {isImageDraft ? (
+                  filteredIssues.map((issue, idx) => (
+                    <ImageIssueCard
+                      key={issue.id || `img_iss_${idx}`}
+                      issue={issue}
+                      index={idx}
+                      isSelected={activeIssueId === issue.id}
+                      onSelect={() => setActiveIssueId(issue.id)}
+                      draftId={draft.id}
+                      draftStatus={draft.status}
+                      onWaiverDecided={handleWaiverDecided}
+                      onRequestException={(item, note) =>
+                        act(
+                          item,
+                          {
+                            action: 'request_exception',
+                            note,
+                          },
+                          'Exception request recorded.',
+                        )
+                      }
+                      disabled={
+                        busy ||
+                        useMock ||
+                        !['DRAFT', 'CHANGES_REQUESTED', 'IN_REVIEW'].includes(
+                          draft.status,
+                        )
+                      }
+                    />
+                  ))
+                ) : (
+                  filteredIssues.map((issue) => (
+                    <IssueCard
+                      key={`${issue.id}_${issue.quote}_${issue.start}`}
+                      issue={issue}
+                      draftId={draft.id}
+                      draftStatus={draft.status}
+                      onWaiverDecided={handleWaiverDecided}
+                      disabled={
+                        busy ||
+                        useMock ||
+                        !['DRAFT', 'CHANGES_REQUESTED', 'IN_REVIEW'].includes(
+                          draft.status,
+                        )
+                      }
+                      onAccept={(item, chosenFix) =>
+                        act(
+                          item,
+                          {
+                            action: 'accept',
+                            chosen_fix: chosenFix,
+                          },
+                          'Fix accepted and checks rerun.',
+                        )
+                      }
+                      onEdit={(item, newText) =>
+                        act(
+                          item,
+                          {
+                            action: 'edit',
+                            new_text: newText,
+                          },
+                          'Phrase updated and checks rerun.',
+                        )
+                      }
+                      onException={(item, note) =>
+                        act(
+                          item,
+                          {
+                            action: 'request_exception',
+                            note,
+                          },
+                          'Exception request recorded.',
+                        )
+                      }
+                    />
+                  ))
+                )}
 
                 {filteredIssues.length === 0 && (
                   <div className="panel p-8 text-center">
@@ -912,6 +1382,145 @@ export default function Studio() {
             </section>
           </div>
         </>
+      )}
+
+      {/* Diff Viewer Modal (P2 / contract_v2) */}
+      {diffModalData && (
+        <DiffViewer
+          diffData={diffModalData}
+          loading={diffLoading}
+          onClose={() => setDiffModalData(null)}
+          versions={versionsList}
+          fromVersion={diffModalData.from}
+          toVersion={diffModalData.to}
+          onSelectVersions={openDiff}
+        />
+      )}
+
+      {/* Side-by-Side Image Diff Viewer Modal (P4 / contract_v2 §8) */}
+      {imageDiffModalData && (
+        <ImageDiffViewer
+          draftId={draft.id}
+          fromVersion={imageDiffModalData.from}
+          toVersion={imageDiffModalData.to}
+          onClose={() => setImageDiffModalData(null)}
+          versions={versionsList}
+          onSelectVersions={(from, to) => setImageDiffModalData({ from, to })}
+        />
+      )}
+
+      {/* Upload Revision Dialog Modal (P2 / contract_v2) */}
+      {isRevisionModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-xs p-4"
+        >
+          <div className="w-full max-w-xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="rounded-xl bg-indigo-50 p-2 text-indigo-600">
+                  <Upload className="h-5 w-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 leading-tight">
+                    Upload New Draft Revision
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Increments revision number, re-runs rule checks, and preserves version history.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsRevisionModalOpen(false)}
+                className="rounded-lg p-1 text-slate-400 hover:text-slate-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUploadRevision} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Revision note / change description (optional)
+                </label>
+                <input
+                  type="text"
+                  value={revisionNote}
+                  onChange={(e) => setRevisionNote(e.target.value)}
+                  placeholder="e.g. Revised claim in paragraph 2, fixed terminology"
+                  className="field text-xs"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  {isImageDraft ? 'Upload replacement image (PNG, JPG)' : 'Upload file (.md, .txt, .docx, .pdf)'}
+                </label>
+                <div className="flex items-center gap-2">
+                  <label className="btn-secondary cursor-pointer text-xs py-1.5 px-3">
+                    <FileUp className="h-3.5 w-3.5" />
+                    <span>Choose replacement {isImageDraft ? 'image' : 'file'}</span>
+                    <input
+                      type="file"
+                      className="hidden"
+                      accept={isImageDraft ? 'image/png,image/jpeg,image/jpg' : '.md,.txt,.docx,.pdf,text/plain,application/pdf'}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0] || null;
+                        setRevisionFile(f);
+                        if (f) setRevisionText('');
+                      }}
+                    />
+                  </label>
+                  {revisionFile && (
+                    <span className="text-xs text-indigo-700 font-medium">
+                      Selected: {revisionFile.name}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {!revisionFile && !isImageDraft && (
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 mb-1">
+                    Or paste revised text directly:
+                  </label>
+                  <textarea
+                    rows={6}
+                    value={revisionText}
+                    onChange={(e) => setRevisionText(e.target.value)}
+                    className="field font-mono text-xs leading-relaxed"
+                    placeholder="Paste revised draft content here..."
+                  />
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsRevisionModalOpen(false)}
+                  className="btn-secondary text-xs"
+                  disabled={busy}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={busy || (!revisionFile && revisionText.trim().length < 3)}
+                  className="btn-primary text-xs"
+                >
+                  {busy ? (
+                    <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Upload className="h-3.5 w-3.5" />
+                  )}
+                  <span>Submit revision & recheck</span>
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

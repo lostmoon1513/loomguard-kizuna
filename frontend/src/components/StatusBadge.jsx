@@ -55,6 +55,11 @@ const config = {
     icon: Clock,
     label: 'exception requested',
   },
+  waived: {
+    cls: 'bg-emerald-100 text-emerald-900 border-emerald-300 font-bold',
+    icon: Check,
+    label: 'waived',
+  },
 };
 
 const fallback = {

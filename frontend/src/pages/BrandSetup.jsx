@@ -419,7 +419,7 @@ export default function BrandSetup() {
                 <p className="mt-1 text-sm text-slate-500">
                   The API returns counts only, not existing term values.
                   Saving replaces the full terms configuration. Required
-                  shape: banned, preferred, hex_codes.
+                  shape: banned, preferred, hex_codes, confidential.
                 </p>
               </div>
 
@@ -441,7 +441,8 @@ export default function BrandSetup() {
                   placeholder={`{
   "banned": [{"term": "example", "reason": "reason"}],
   "preferred": [{"avoid": "old phrase", "use": "preferred phrase"}],
-  "hex_codes": ["#334155"]
+  "hex_codes": ["#334155"],
+  "confidential": [{"term": "Project Aurora", "kind": "confidential"}]
 }`}
                 />
 

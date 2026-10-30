@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Bell, CircleHelp, LoaderCircle, X } from 'lucide-react';
+import { Bell, CircleHelp, LoaderCircle, LogOut, User, X } from 'lucide-react';
 import { useLocation } from 'react-router-dom';
 import { getHealth } from '../api/drafts.js';
+import { useAuth } from '../context/AuthContext.jsx';
 
 const titles = {
   '/studio': [
@@ -26,24 +27,19 @@ const titles = {
   ],
 };
 
-export default function Header({ role, setRole }) {
+export default function Header() {
   const location = useLocation();
-
-  const [user, setUser] = useState(
-    localStorage.getItem('loomguard-user') || 'creator',
-  );
+  const { user, role, logout } = useAuth();
 
   const [showHelp, setShowHelp] = useState(false);
   const [backendStatus, setBackendStatus] = useState('checking'); // 'checking' | 'online' | 'waking'
 
-  const [title, subtitle] = titles[location.pathname] || [
+  // Match /drafts/:id to Studio title
+  const currentPath = location.pathname.startsWith('/drafts/') ? '/studio' : location.pathname;
+  const [title, subtitle] = titles[currentPath] || [
     'LoomGuard',
     'Brand governance workspace',
   ];
-
-  useEffect(() => {
-    localStorage.setItem('loomguard-user', user);
-  }, [user]);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,14 +66,10 @@ export default function Header({ role, setRole }) {
     };
   }, []);
 
-  const changeRole = (next) => {
-    setRole(next);
-
-    const nextUser = next === 'manager' ? 'manager' : 'creator';
-
-    setUser(nextUser);
-    localStorage.setItem('loomguard-role', next);
-    localStorage.setItem('loomguard-user', nextUser);
+  const getRoleBadgeClass = () => {
+    if (role === 'manager') return 'bg-amber-100 text-amber-800 border-amber-200';
+    if (role === 'reviewer') return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+    return 'bg-indigo-100 text-indigo-800 border-indigo-200';
   };
 
   return (
@@ -94,7 +86,7 @@ export default function Header({ role, setRole }) {
       </div>
 
       {/* Right: controls */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2.5">
         {/* Render Free Tier Backend Status Pill */}
         {backendStatus === 'waking' && (
           <div
@@ -116,22 +108,39 @@ export default function Header({ role, setRole }) {
           </div>
         )}
 
-        {/* Role pill switcher */}
-        <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1 gap-1">
-          {['creator', 'manager'].map((r) => (
-            <button
-              key={r}
-              onClick={() => changeRole(r)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                role === r
-                  ? 'bg-white text-indigo-700 shadow-sm shadow-slate-200 border border-slate-200'
-                  : 'text-slate-500 hover:text-slate-700'
-              }`}
+        {/* Authenticated User & Role Display */}
+        {user && (
+          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-1.5">
+            <div className="grid h-6 w-6 place-items-center rounded-lg bg-slate-200 text-slate-600">
+              <User className="h-3.5 w-3.5" />
+            </div>
+            <div className="flex flex-col text-left">
+              <span className="text-xs font-bold text-slate-800 leading-tight">
+                {user.name || user.email || 'Authenticated User'}
+              </span>
+              <span className="text-[10px] text-slate-500 leading-tight font-medium">
+                {user.email}
+              </span>
+            </div>
+            <span
+              className={`ml-1.5 rounded-md border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${getRoleBadgeClass()}`}
             >
-              {r.charAt(0).toUpperCase() + r.slice(1)}
-            </button>
-          ))}
-        </div>
+              {role || 'creator'}
+            </span>
+          </div>
+        )}
+
+        {/* Sign Out Button */}
+        {user && (
+          <button
+            onClick={logout}
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 transition-all"
+            title="Sign out of LoomGuard"
+          >
+            <LogOut className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Sign out</span>
+          </button>
+        )}
 
         {/* Bell */}
         <button
@@ -169,11 +178,17 @@ export default function Header({ role, setRole }) {
             </button>
           </div>
 
-          <p className="text-slate-600 leading-6">
+          <p className="text-slate-600 leading-6 text-xs">
             Check a draft, review source-backed findings, resolve mandatory
             issues, then submit it for a manager decision. LoomGuard does
             not auto-approve or rewrite entire documents.
           </p>
+
+          <div className="mt-3 pt-3 border-t border-slate-100 text-[11px] text-slate-500 space-y-1">
+            <div>• <strong className="text-slate-700">Creator:</strong> Drafts, edits, & exception requests</div>
+            <div>• <strong className="text-slate-700">Manager:</strong> Approvals, rejections, & waivers</div>
+            <div>• <strong className="text-slate-700">Reviewer:</strong> Claim checks & claim-level waivers</div>
+          </div>
         </div>
       )}
     </header>

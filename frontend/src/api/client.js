@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const baseURL = import.meta.env.VITE_API_URL?.trim();
+const baseURL = import.meta.env?.VITE_API_URL?.trim();
 
 if (!baseURL) {
   console.warn(
@@ -16,23 +16,34 @@ export const api = axios.create({
   },
 });
 
+// Request interceptor: Attach JWT Bearer token from localStorage (Design Rule N5)
 api.interceptors.request.use((config) => {
-  const role = localStorage.getItem('loomguard-role') || 'creator';
+  const token = localStorage.getItem('loomguard_jwt_token');
+  if (token) {
+    config.headers['Authorization'] = `Bearer ${token}`;
+  }
 
-  const user =
-    localStorage.getItem('loomguard-user') ||
-    (role === 'manager' ? 'manager' : 'creator');
-
-  config.headers['X-Role'] = role;
-  config.headers['X-User'] = user;
+  // Also include user/role legacy headers temporarily during backend migration
+  const legacyRole = localStorage.getItem('loomguard-role');
+  const legacyUser = localStorage.getItem('loomguard-user');
+  if (legacyRole) config.headers['X-Role'] = legacyRole;
+  if (legacyUser) config.headers['X-User'] = legacyUser;
 
   return config;
 });
 
-// Automatic retry for GET requests when backend is spinning up on Render free tier
+// Automatic retry for GET requests when backend is spinning up on Render free tier + 401 handler
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // Handle 401 Unauthorized (session expired or invalid token)
+    if (error.response?.status === 401) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('loomguard:unauthorized'));
+      }
+      return Promise.reject(error);
+    }
+
     const config = error.config;
     if (!config || config.method?.toLowerCase() !== 'get') {
       return Promise.reject(error);
@@ -65,6 +76,12 @@ export function getErrorMessage(error) {
   }
   if ([502, 503, 504].includes(error?.response?.status)) {
     return 'The backend server is currently starting up (Render free tier). Please wait a moment and try again.';
+  }
+  if (error?.response?.status === 401) {
+    return error?.response?.data?.error?.message || 'Invalid credentials or session expired.';
+  }
+  if (error?.response?.status === 403) {
+    return error?.response?.data?.error?.message || 'Forbidden: You do not have permission for this action.';
   }
   return (
     error?.response?.data?.error?.message ||

@@ -26,7 +26,7 @@ class Issue(BaseModel):
     source: IssueSource
     quote: str
     start: int = Field(ge=0)
-    end: int = Field(gt=0)
+    end: int = Field(ge=0)
     reason: str
     citation: Optional[Citation] = None
     suggested_fixes: list[str] = Field(default_factory=list, max_length=3)
@@ -38,7 +38,7 @@ class Issue(BaseModel):
 
     @model_validator(mode="after")
     def _offsets_ordered(self):
-        if self.end <= self.start:
+        if self.end <= self.start and not (self.start == 0 and self.end == 0):
             raise ValueError("end must be greater than start")
         return self
 
@@ -70,6 +70,8 @@ class Draft(BaseModel):
     def _quotes_match_text(self):
         """Guard: every issue quote must equal text[start:end]."""
         for i in self.issues:
+            if i.start == 0 and i.end == 0:
+                continue
             if self.text[i.start:i.end] != i.quote:
                 raise ValueError(f"issue {i.id}: quote does not match text[{i.start}:{i.end}]")
         return self
