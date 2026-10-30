@@ -50,7 +50,7 @@ Misses (honest failures):
 
 ## 7. Performance & Latency
 
-Rule-based text checks: Mean 1.4 ms, p95 1.8 ms, max 1.8 ms per draft.
+Rule-based text checks: Mean 1.3 ms, p95 1.6 ms, max 1.8 ms per draft.
 Image analysis (K-Means in Lab + CIEDE2000): ~150-250 ms. AI calls add network time.
 
 ## 8. What this evaluation found (and what we changed)

@@ -1,6 +1,6 @@
 # LoomGuard
-
-**Pre-publication brand review and compliance platform** · Team KIZUNA · Inkloom AI Hackathon, Round 2 (The Build)
+ 
+**Pre-publication brand review and compliance platform** · Team KIZUNA · Inkloom AI Hackathon, Round 3
 
 LoomGuard checks a marketing draft against the company's brand guide and approved-facts sheet **before** it is published. It shows exactly which guide page or spreadsheet row each issue comes from, suggests small phrase-level fixes that keep the writer's wording, and sends the draft to a human manager for approval. It checks content. It never writes content and never approves anything by itself.
 
@@ -118,19 +118,19 @@ All errors share one shape: `{"error": {"code": "...", "message": "..."}}`.
 
 ```bash
 cd backend
-pytest tests -q                  # 47 tests
+pytest tests -q                  # 143 tests passed
 python -m evals.run_evals        # writes evals/results.md and results.json
 ```
 
 Results on 56 labelled drafts (39 issues, 23 clean drafts), rule-based checks only:
 
-| System | Precision | Recall | False alarms on clean drafts |
-|---|---|---|---|
-| A: generic checker (no brand kit) | 100% | 18% | 0 of 23 |
-| B: brand kit + retrieval only | 100% | 46% | 0 of 23 |
-| **C: full LoomGuard** | **100%** | **100%** | **0 of 23** |
+| System | Precision | Recall | False alarms on clean drafts | Claim status accuracy | Citation accuracy |
+|---|---|---|---|---|---|
+| A: generic checker (no brand kit) | 100% | 18% | 0 of 23 | 0% (22) | 0% |
+| B: brand kit + retrieval only | 100% | 46% | 0 of 23 | 36% (22) | 100% |
+| **C: full LoomGuard** | **100%** | **100%** | **0 of 23** | **100% (22/22)** | **100%** |
 
-Claim status 22/22, citations 23/23, retrieval Hit@3 97% (keyword mode), prompt-injection scan caught 8 of 8 attacks and flagged 0 of 6 harmless texts. A second, independent brand kit (NexusPay) was run end to end as a check.
+Claim status 22/22, citations 23/23, retrieval Hit@3 97% (keyword mode), prompt-injection scan caught 8 of 8 attacks and flagged 0 of 6 harmless texts. CIEDE2000 color difference MAE 0.000022 across 23 Sharma benchmark pairs, 100% WCAG contrast accuracy, 100% sensitive masking recall across cards/keys/emails/phones with 0% false positives on business numbers.
 
 ### Second brand kit: NexusPay (independent test)
 
@@ -162,33 +162,37 @@ What it showed on the flawed draft: 13 issues across tone, claim, terminology an
 
 ```
 backend/            FastAPI app and everything it needs
-  app/              routers/, services/ (rules, claims, retrieval, Gemini, workflow), schemas, config
+  app/              routers/, services/ (rules, claims, retrieval, Gemini, workflow, color_science, image_check, masking, insights), schemas, config
   demo_kit/         Aurora demo brand guide PDF, facts CSV, terms, sample drafts
   evals/            golden sets, run_evals.py, results.md
-  tests/            pytest suites
+  tests/            pytest suites (143 test cases)
+  scripts/          smoke.py judge test runner
   web/              built web app served by the backend
 frontend/           React + Vite source of the web app
-NexusPay kit/       second, independent brand kit and end-to-end test runner
+nexuspay_kit/       second, independent brand kit and end-to-end test runner
 sample_kit/         generator for the Aurora demo kit
-docs/               contract, deploy notes, changes from plan, submission text
+docs/               contract_v2, deploy notes, changes from plan, submission text
+ROUND3_HANDOFF.md   judge walkthrough and complete architecture guide
 render.yaml         Render blueprint
-HANDOFF.md  ROADMAP.md  WORKFLOW.md   build notes and plan
-LICENSE
 ```
 
-## Changes from the Round 1 plan
+## Round 3 Major Improvements (Completed)
 
-pypdf instead of PyMuPDF · own BM25 + numpy + RRF instead of ChromaDB · four code-decided claim states instead of similarity only · `asyncio` instead of LangGraph · role switch instead of login · Gemini model name is now a setting. Added: prompt-injection scan, AI output guard, evaluation harness, quota-aware fallbacks. Details in `docs/changes_from_plan.md`.
+1. **Image & Banner Checker with WCAG 2.1 AA:** Content-verified upload (PNG/JPEG), dominant palette extraction via K-Means in CIELAB space, CIEDE2000 distance matching ($\le 6.0\ \Delta E_{00}$), Gemini Vision for element bounding boxes, relative luminance contrast measured in code (4.5:1 / 3:1), same-hue passing fix suggestions, annotated image rendering (`?annotate=true`), and `422 FIX_BY_REUPLOAD` workflow.
+2. **Revision History, Word Diff & Exception Waivers:** Full draft revision ledger (`versions[]`), word-level sequence-matched diffing with mathematical reconstruction invariance, formal exception waiver lifecycle (`exception_requested` -> `waiver_granted`/`denied`) with automatic text-edit expiration, and cryptographic JWT bearer token authentication with 4 roles.
+3. **Governance Insights Over Time & Sensitive Data Masking:** Pre-LLM local regex and algorithmic masking for cards (Luhn-checked), API keys, JWTs, emails, phones, and confidential terms with fail-closed prompt leak protection; weekly trend tracking, deterministic evidence-backed recommendations, CSV export, compliance PDF download, and demo history seeding.
 
-## Round 3 plan
+## Hardening & Defenses
 
-1. **Image and banner checker with WCAG** (K-Means colours, CIEDE2000 against the palette, 4.5:1 contrast, Gemini Vision for layout).
-2. **Revision history, diff view and exception waivers** with real sign-in (Creator, Manager, Compliance Reviewer).
-3. **Governance insights over time and local sensitive-data masking** before any AI call.
+- Sliding-window rate limiter (240 general req/min, 20 heavy AI req/min) with `Retry-After` headers.
+- Text normalization stripping zero-width characters and normalizing smart quotes/dashes before rule checking.
+- Automated judge smoke testing script (`backend/scripts/smoke.py`).
 
 ## Known limitations
 
-Text only in Round 2 · text PDFs only · AI checks depend on Gemini quota · unusual claim phrasing can be missed · simplified roles (no sign-in yet) · free hosting sleeps and in-memory drafts are lost on restart if MongoDB is unreachable.
+- Offline retrieval uses BM25 keyword matching + RRF; full semantic search requires active Gemini embedding quota.
+- Text within images is not masked before passing to Gemini Vision (creators can switch AI off for local palette-only checking).
+- Free-tier hosting on Render sleeps when idle and clears in-memory drafts on restart if MongoDB Atlas is unreachable.
 
 ## Responsible use and disclosure
 
